@@ -1,0 +1,66 @@
+{
+  "expo": {
+    "name": "Tandyr",
+    "slug": "tandyr-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "scheme": "tandyr",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.tandyr.mobile",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Нам нужна камера для фотографирования рабочего места",
+        "NSLocationWhenInUseUsageDescription": "Нам нужна геолокация для определения точки магазина",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Нам нужна геолокация для определения точки магазина"
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#E8564A"
+      },
+      "package": "com.tandyr.mobile",
+      "permissions": [
+        "CAMERA",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "RECEIVE_BOOT_COMPLETED",
+        "VIBRATE"
+      ]
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Разрешение на доступ к фото не нужно",
+          "cameraPermission": "Нам нужна камера для фотографирования рабочего места"
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Нам нужна геолокация для определения точки магазина"
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#E8564A"
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
