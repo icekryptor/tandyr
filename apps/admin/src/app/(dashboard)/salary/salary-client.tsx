@@ -19,7 +19,7 @@ import {
   CheckCircle, FileSpreadsheet, User,
 } from 'lucide-react';
 import { calculateWeeklySalary, updateSalaryPayment } from './actions';
-import { formatDate } from '@tandyr/shared';
+import { formatDate, pluralize } from '@tandyr/shared';
 import type { WeeklySalary } from '@tandyr/shared';
 
 type RecordWithUser = WeeklySalary & {
@@ -336,7 +336,7 @@ export function SalaryClient({ records, employees, currentWeek, currentYear }: P
       <div className="flex items-center justify-between mb-6 gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold">Зарплата</h1>
-          <p className="text-muted-foreground text-sm mt-1">{records.length} записей</p>
+          <p className="text-muted-foreground text-sm mt-1">{records.length} {pluralize(records.length, 'запись', 'записи', 'записей')}</p>
         </div>
         <div className="flex gap-2 flex-wrap">
           <Button variant="outline" onClick={exportXLS} disabled={records.length === 0}>

@@ -15,7 +15,7 @@ import {
 import { UserPlus, Search, ShieldBan, ShieldCheck } from 'lucide-react';
 import Link from 'next/link';
 import { createEmployee, toggleEmployeeStatus } from './actions';
-import { COMPANY_ROLE_LABELS, COMPANY_ROLE_COLORS } from '@tandyr/shared';
+import { COMPANY_ROLE_LABELS, COMPANY_ROLE_COLORS, pluralize } from '@tandyr/shared';
 import type { User, Store } from '@tandyr/shared';
 
 const COMPANY_ROLES = [
@@ -75,7 +75,7 @@ export function EmployeesClient({ employees, stores }: Props) {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold">Сотрудники</h1>
-          <p className="text-muted-foreground text-sm mt-1">{employees.length} {employees.length === 1 ? 'сотрудник' : employees.length < 5 ? 'сотрудника' : 'сотрудников'}</p>
+          <p className="text-muted-foreground text-sm mt-1">{employees.length} {pluralize(employees.length, 'сотрудник', 'сотрудника', 'сотрудников')}</p>
         </div>
         <Dialog open={createOpen} onOpenChange={handleDialogChange}>
           <DialogTrigger asChild>

@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Plus, Trash2, MapPin, Mail, Phone, ChevronRight } from 'lucide-react';
 import { createStore, deleteStore } from './actions';
 import { YandexMapPicker } from '@/components/yandex-map-picker';
-import { CHAIN_LABELS } from '@tandyr/shared';
+import { CHAIN_LABELS, pluralize } from '@tandyr/shared';
 import type { Store } from '@tandyr/shared';
 
 const CHAINS = [
@@ -58,7 +58,7 @@ export function StoresClient({ stores, users }: { stores: Store[]; users: StaffU
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold">Магазины</h1>
-          <p className="text-muted-foreground text-sm mt-1">{stores.length} точек</p>
+          <p className="text-muted-foreground text-sm mt-1">{stores.length} {pluralize(stores.length, 'точка', 'точки', 'точек')}</p>
         </div>
         <Dialog open={createOpen} onOpenChange={handleDialogChange}>
           <DialogTrigger asChild>

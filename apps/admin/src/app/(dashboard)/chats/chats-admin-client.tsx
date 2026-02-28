@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { MessageSquarePlus, MessageSquare, Users, ChevronRight } from 'lucide-react';
 import { createChatRoom } from './actions';
-import { formatDateTime } from '@tandyr/shared';
+import { formatDateTime, pluralize } from '@tandyr/shared';
 
 interface RoomMember {
   user_id: string;
@@ -69,7 +69,7 @@ export function ChatsAdminClient({
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold">Чаты</h1>
-          <p className="text-muted-foreground text-sm mt-1">{rooms.length} {rooms.length === 1 ? 'чат' : 'чатов'}</p>
+          <p className="text-muted-foreground text-sm mt-1">{rooms.length} {pluralize(rooms.length, 'чат', 'чата', 'чатов')}</p>
         </div>
         <Dialog open={createOpen} onOpenChange={setCreateOpen}>
           <DialogTrigger asChild>

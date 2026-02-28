@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { formatDateTime, formatKg, SHIFT_STATUS_LABELS } from '@tandyr/shared';
+import { formatDateTime, formatKg, SHIFT_STATUS_LABELS, pluralize } from '@tandyr/shared';
 import type { Shift, Store } from '@tandyr/shared';
 
 type ShiftRow = Shift & {
@@ -40,7 +40,7 @@ export function ShiftsClient({
     <div className="p-6 max-w-7xl mx-auto">
       <div className="mb-6">
         <h1 className="text-2xl font-bold">Смены</h1>
-        <p className="text-muted-foreground text-sm mt-1">{shifts.length} записей</p>
+        <p className="text-muted-foreground text-sm mt-1">{shifts.length} {pluralize(shifts.length, 'запись', 'записи', 'записей')}</p>
       </div>
 
       {/* Filters */}
