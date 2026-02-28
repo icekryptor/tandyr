@@ -1,4 +1,6 @@
-import { createClient } from '@/lib/supabase/server';
+export const dynamic = 'force-dynamic';
+
+import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { ShiftsClient } from './shifts-client';
 
 export default async function ShiftsPage({
@@ -7,13 +9,17 @@ export default async function ShiftsPage({
   searchParams: Promise<{ store?: string; status?: string; date?: string }>;
 }) {
   const params = await searchParams;
-  const supabase = await createClient();
 
-  let query = supabase
+  const admin = createAdminClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  );
+
+  let query = admin
     .from('shifts')
-    .select('*, user:users(full_name, email), store:stores(name)')
+    .select('*, user:users(id, full_name, email), store:stores(id, name)')
     .order('created_at', { ascending: false })
-    .limit(100);
+    .limit(200);
 
   if (params.store) query = query.eq('store_id', params.store);
   if (params.status) query = query.eq('status', params.status);
@@ -25,7 +31,7 @@ export default async function ShiftsPage({
 
   const [{ data: shifts }, { data: stores }] = await Promise.all([
     query,
-    supabase.from('stores').select('id, name').order('name'),
+    admin.from('stores').select('id, name').order('name'),
   ]);
 
   return <ShiftsClient shifts={shifts ?? []} stores={stores ?? []} />;

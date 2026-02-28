@@ -12,9 +12,19 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
 } from '@/components/ui/dialog';
-import { UserPlus, Pencil, UserX, UserCheck, Search } from 'lucide-react';
-import { createEmployee, updateEmployee, toggleEmployeeStatus } from './actions';
+import { UserPlus, Search, ShieldBan, ShieldCheck } from 'lucide-react';
+import Link from 'next/link';
+import { createEmployee, toggleEmployeeStatus } from './actions';
+import { COMPANY_ROLE_LABELS, COMPANY_ROLE_COLORS } from '@tandyr/shared';
 import type { User, Store } from '@tandyr/shared';
+
+const COMPANY_ROLES = [
+  { value: 'baker', label: 'Пекарь' },
+  { value: 'manager', label: 'Управляющий' },
+  { value: 'tech_specialist', label: 'Тех. специалист' },
+  { value: 'admin', label: 'Администратор' },
+  { value: 'owner', label: 'Владелец' },
+];
 
 interface Props {
   employees: (User & { store: { name: string } | null })[];
@@ -24,9 +34,10 @@ interface Props {
 export function EmployeesClient({ employees, stores }: Props) {
   const [search, setSearch] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
-  const [editEmployee, setEditEmployee] = useState<Props['employees'][0] | null>(null);
-  const [isPending, startTransition] = useTransition();
+  const [isCreating, startCreateTransition] = useTransition();
+  const [isToggling, startToggleTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [toggleError, setToggleError] = useState<string | null>(null);
 
   const filtered = employees.filter((e) =>
     e.full_name.toLowerCase().includes(search.toLowerCase()) ||
@@ -37,33 +48,26 @@ export function EmployeesClient({ employees, stores }: Props) {
     e.preventDefault();
     setError(null);
     const fd = new FormData(e.currentTarget);
-    startTransition(async () => {
+    startCreateTransition(async () => {
       const result = await createEmployee(fd);
-      if (result?.error) {
-        setError(result.error);
-      } else {
-        setCreateOpen(false);
-      }
+      if (result?.error) setError(result.error);
+      else setCreateOpen(false);
     });
   };
 
-  const handleUpdate = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleToggle = (id: string, isActive: boolean, e: React.MouseEvent) => {
     e.preventDefault();
-    if (!editEmployee) return;
-    setError(null);
-    const fd = new FormData(e.currentTarget);
-    startTransition(async () => {
-      const result = await updateEmployee(editEmployee.id, fd);
-      if (result?.error) {
-        setError(result.error);
-      } else {
-        setEditEmployee(null);
-      }
+    e.stopPropagation();
+    setToggleError(null);
+    startToggleTransition(async () => {
+      const result = await toggleEmployeeStatus(id, isActive);
+      if (result?.error) setToggleError(result.error);
     });
   };
 
-  const handleToggle = (id: string, isActive: boolean) => {
-    startTransition(async () => { await toggleEmployeeStatus(id, isActive); });
+  const handleDialogChange = (open: boolean) => {
+    setCreateOpen(open);
+    if (open) setError(null);
   };
 
   return (
@@ -71,9 +75,9 @@ export function EmployeesClient({ employees, stores }: Props) {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold">Сотрудники</h1>
-          <p className="text-muted-foreground text-sm mt-1">{employees.length} сотрудников</p>
+          <p className="text-muted-foreground text-sm mt-1">{employees.length} {employees.length === 1 ? 'сотрудник' : employees.length < 5 ? 'сотрудника' : 'сотрудников'}</p>
         </div>
-        <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <Dialog open={createOpen} onOpenChange={handleDialogChange}>
           <DialogTrigger asChild>
             <Button>
               <UserPlus className="h-4 w-4 mr-2" />
@@ -89,15 +93,22 @@ export function EmployeesClient({ employees, stores }: Props) {
               <FormField label="Email" name="email" type="email" required />
               <FormField label="Пароль" name="password" type="password" required />
               <FormField label="Телефон" name="phone" />
+              <CompanyRoleSelect />
               <StoreSelect stores={stores} />
               {error && <p className="text-destructive text-sm">{error}</p>}
-              <Button type="submit" className="w-full" disabled={isPending}>
-                {isPending ? 'Создание...' : 'Создать'}
+              <Button type="submit" className="w-full" disabled={isCreating}>
+                {isCreating ? 'Создание...' : 'Создать'}
               </Button>
             </form>
           </DialogContent>
         </Dialog>
       </div>
+
+      {toggleError && (
+        <div className="mb-4 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
+          Ошибка: {toggleError}
+        </div>
+      )}
 
       {/* Search */}
       <div className="relative mb-4">
@@ -116,63 +127,72 @@ export function EmployeesClient({ employees, stores }: Props) {
           <TableHeader>
             <TableRow className="bg-muted/40">
               <TableHead>Сотрудник</TableHead>
+              <TableHead>Роль в компании</TableHead>
               <TableHead>Телефон</TableHead>
               <TableHead>Магазин</TableHead>
               <TableHead>Статус</TableHead>
-              <TableHead className="text-right">Действия</TableHead>
+              <TableHead className="w-10" />
             </TableRow>
           </TableHeader>
           <TableBody>
             {filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center text-muted-foreground py-10">
+                <TableCell colSpan={6} className="text-center text-muted-foreground py-10">
                   Сотрудники не найдены
                 </TableCell>
               </TableRow>
             ) : (
               filtered.map((emp) => (
-                <TableRow key={emp.id}>
+                <TableRow key={emp.id} className={`cursor-pointer hover:bg-muted/30 ${!emp.is_active ? 'opacity-50' : ''}`}>
                   <TableCell>
-                    <div>
+                    <Link href={`/employees/${emp.id}`} className="block">
                       <p className="font-medium text-foreground">{emp.full_name}</p>
                       <p className="text-xs text-muted-foreground">{emp.email}</p>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground text-sm">
-                    {emp.phone ?? '—'}
-                  </TableCell>
-                  <TableCell className="text-sm">
-                    {emp.store?.name ?? <span className="text-muted-foreground">Не назначен</span>}
+                    </Link>
                   </TableCell>
                   <TableCell>
-                    <Badge variant={emp.is_active ? 'default' : 'secondary'}>
-                      {emp.is_active ? 'Активен' : 'Деактивирован'}
-                    </Badge>
+                    <Link href={`/employees/${emp.id}`} className="block">
+                      {emp.company_role ? (
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${COMPANY_ROLE_COLORS[emp.company_role] ?? 'bg-muted text-muted-foreground'}`}>
+                          {COMPANY_ROLE_LABELS[emp.company_role] ?? emp.company_role}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground text-sm">—</span>
+                      )}
+                    </Link>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground text-sm">
+                    <Link href={`/employees/${emp.id}`} className="block">
+                      {emp.phone ?? '—'}
+                    </Link>
+                  </TableCell>
+                  <TableCell className="text-sm">
+                    <Link href={`/employees/${emp.id}`} className="block">
+                      {emp.store?.name ?? <span className="text-muted-foreground">Не назначен</span>}
+                    </Link>
+                  </TableCell>
+                  <TableCell>
+                    <Link href={`/employees/${emp.id}`} className="block">
+                      <Badge variant={emp.is_active ? 'default' : 'destructive'}>
+                        {emp.is_active ? 'Активен' : 'Заблокирован'}
+                      </Badge>
+                    </Link>
                   </TableCell>
                   <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => { setEditEmployee(emp); setError(null); }}
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 hover:text-destructive"
-                        onClick={() => handleToggle(emp.id, emp.is_active)}
-                        disabled={isPending}
-                      >
-                        {emp.is_active ? (
-                          <UserX className="h-3.5 w-3.5" />
-                        ) : (
-                          <UserCheck className="h-3.5 w-3.5 text-green-600" />
-                        )}
-                      </Button>
-                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className={`h-8 w-8 ${emp.is_active ? 'hover:text-destructive' : 'hover:text-green-600'}`}
+                      title={emp.is_active ? 'Заблокировать' : 'Разблокировать'}
+                      onClick={(e) => handleToggle(emp.id, emp.is_active, e)}
+                      disabled={isToggling}
+                    >
+                      {emp.is_active ? (
+                        <ShieldBan className="h-3.5 w-3.5" />
+                      ) : (
+                        <ShieldCheck className="h-3.5 w-3.5 text-green-600" />
+                      )}
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))
@@ -181,59 +201,44 @@ export function EmployeesClient({ employees, stores }: Props) {
         </Table>
       </div>
 
-      {/* Edit dialog */}
-      <Dialog open={!!editEmployee} onOpenChange={(open) => { if (!open) setEditEmployee(null); }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Редактировать сотрудника</DialogTitle>
-          </DialogHeader>
-          {editEmployee && (
-            <form onSubmit={handleUpdate} className="space-y-4 mt-2">
-              <FormField label="ФИО" name="full_name" defaultValue={editEmployee.full_name} required />
-              <FormField label="Телефон" name="phone" defaultValue={editEmployee.phone ?? ''} />
-              <StoreSelect stores={stores} defaultValue={editEmployee.store_id ?? ''} />
-              {error && <p className="text-destructive text-sm">{error}</p>}
-              <Button type="submit" className="w-full" disabled={isPending}>
-                {isPending ? 'Сохранение...' : 'Сохранить'}
-              </Button>
-            </form>
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
 
 function FormField({
-  label,
-  name,
-  type = 'text',
-  defaultValue = '',
-  required = false,
+  label, name, type = 'text', defaultValue = '', required = false,
 }: {
-  label: string;
-  name: string;
-  type?: string;
-  defaultValue?: string;
-  required?: boolean;
+  label: string; name: string; type?: string; defaultValue?: string; required?: boolean;
 }) {
   return (
     <div className="space-y-1.5">
       <Label htmlFor={name}>{label}</Label>
-      <Input
-        id={name}
-        name={name}
-        type={type}
-        defaultValue={defaultValue}
-        required={required}
-      />
+      <Input id={name} name={name} type={type} defaultValue={defaultValue} required={required} />
+    </div>
+  );
+}
+
+function CompanyRoleSelect({ defaultValue = '' }: { defaultValue?: string }) {
+  return (
+    <div className="space-y-1.5">
+      <Label htmlFor="company_role">Роль в компании</Label>
+      <Select name="company_role" defaultValue={defaultValue}>
+        <SelectTrigger>
+          <SelectValue placeholder="Выберите роль" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="__none__">— Не указано —</SelectItem>
+          {COMPANY_ROLES.map((r) => (
+            <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
     </div>
   );
 }
 
 function StoreSelect({
-  stores,
-  defaultValue = '',
+  stores, defaultValue = '',
 }: {
   stores: Pick<Store, 'id' | 'name'>[];
   defaultValue?: string;
@@ -246,7 +251,7 @@ function StoreSelect({
           <SelectValue placeholder="Выберите магазин" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="none">Не назначен</SelectItem>
+          <SelectItem value="__none__">Не назначен</SelectItem>
           {stores.map((s) => (
             <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
           ))}

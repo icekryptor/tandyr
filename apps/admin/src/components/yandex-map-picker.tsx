@@ -5,10 +5,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { MapPin, Search, Loader2 } from 'lucide-react';
 
-declare global {
-  var ymaps3: any;
-}
-
 interface MapPickerValue {
   address: string;
   latitude: number;
@@ -20,8 +16,8 @@ interface YandexMapPickerProps {
   onChange?: (value: MapPickerValue) => void;
 }
 
-const DEFAULT_CENTER: [number, number] = [37.618423, 55.751244]; // [lon, lat]
-const DEFAULT_ZOOM = 11;
+const DEFAULT_LAT = 55.751244;
+const DEFAULT_LNG = 37.618423;
 
 async function geocodeForward(query: string): Promise<Array<{ address: string; lon: number; lat: number }>> {
   try {
@@ -49,17 +45,18 @@ export function YandexMapPicker({ defaultValue, onChange }: YandexMapPickerProps
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
   const markerRef = useRef<any>(null);
+  const leafletRef = useRef<typeof import('leaflet') | null>(null);
 
   const [searchQuery, setSearchQuery] = useState(defaultValue?.address || '');
   const [suggestions, setSuggestions] = useState<Array<{ address: string; lon: number; lat: number }>>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [searching, setSearching] = useState(false);
   const [address, setAddress] = useState(defaultValue?.address || '');
-  const [latitude, setLatitude] = useState(defaultValue?.latitude ?? 55.751244);
-  const [longitude, setLongitude] = useState(defaultValue?.longitude ?? 37.618423);
+  const [latitude, setLatitude] = useState(defaultValue?.latitude ?? DEFAULT_LAT);
+  const [longitude, setLongitude] = useState(defaultValue?.longitude ?? DEFAULT_LNG);
   const [mapReady, setMapReady] = useState(false);
 
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const suggestionsRef = useRef<HTMLDivElement>(null);
 
   const updateValue = useCallback(
@@ -78,61 +75,61 @@ export function YandexMapPicker({ defaultValue, onChange }: YandexMapPickerProps
     async function init() {
       if (!mapContainerRef.current) return;
 
-      const waitForYmaps = () =>
-        new Promise<void>((resolve) => {
-          const check = () => {
-            if (typeof ymaps3 !== 'undefined') return resolve();
-            setTimeout(check, 200);
-          };
-          check();
-        });
-
-      await waitForYmaps();
-      await ymaps3.ready;
+      const L = await import('leaflet');
+      leafletRef.current = L;
       if (cancelled) return;
 
-      const { YMap, YMapDefaultSchemeLayer, YMapDefaultFeaturesLayer, YMapMarker, YMapListener } = ymaps3;
-
       const hasDefault = defaultValue?.latitude && defaultValue?.longitude;
-      const center: [number, number] = hasDefault
-        ? [defaultValue.longitude!, defaultValue.latitude!]
-        : DEFAULT_CENTER;
+      const lat = hasDefault ? defaultValue.latitude! : DEFAULT_LAT;
+      const lng = hasDefault ? defaultValue.longitude! : DEFAULT_LNG;
 
-      const map = new YMap(mapContainerRef.current, {
-        location: { center, zoom: hasDefault ? 15 : DEFAULT_ZOOM },
+      const map = L.map(mapContainerRef.current, {
+        center: [lat, lng],
+        zoom: hasDefault ? 15 : 11,
+        zoomControl: true,
+        attributionControl: false,
       });
 
-      map.addChild(new YMapDefaultSchemeLayer({}));
-      map.addChild(new YMapDefaultFeaturesLayer({}));
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+      }).addTo(map);
 
-      const el = document.createElement('div');
-      el.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="40" viewBox="0 0 32 40" fill="none">
-        <path d="M16 0C7.163 0 0 7.163 0 16c0 12 16 24 16 24s16-12 16-24C32 7.163 24.837 0 16 0z" fill="#E53935"/>
-        <circle cx="16" cy="16" r="6" fill="white"/>
-      </svg>`;
-      el.style.transform = 'translate(-16px, -40px)';
-      el.style.cursor = 'pointer';
+      const icon = L.divIcon({
+        html: `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="40" viewBox="0 0 32 40" fill="none">
+          <path d="M16 0C7.163 0 0 7.163 0 16c0 12 16 24 16 24s16-12 16-24C32 7.163 24.837 0 16 0z" fill="#E53935"/>
+          <circle cx="16" cy="16" r="6" fill="white"/>
+        </svg>`,
+        className: '',
+        iconSize: [32, 40],
+        iconAnchor: [16, 40],
+      });
 
-      const marker = new YMapMarker({ coordinates: center }, el);
-      map.addChild(marker);
+      const marker = L.marker([lat, lng], { icon, draggable: true }).addTo(map);
       markerRef.current = marker;
 
-      const listener = new YMapListener({
-        layer: 'any',
-        onClick: async (_: any, event: any) => {
-          if (!event?.coordinates) return;
-          const [lon, lat] = event.coordinates;
-          marker.update({ coordinates: [lon, lat] });
-          const addr = await geocodeReverse(lon, lat);
-          if (!cancelled) {
-            updateValue(addr, lat, lon);
-            setSearchQuery(addr);
-          }
-        },
+      marker.on('dragend', async () => {
+        const pos = marker.getLatLng();
+        const addr = await geocodeReverse(pos.lng, pos.lat);
+        if (!cancelled) {
+          updateValue(addr, pos.lat, pos.lng);
+          setSearchQuery(addr);
+        }
       });
-      map.addChild(listener);
+
+      map.on('click', async (e: any) => {
+        const { lat: clickLat, lng: clickLng } = e.latlng;
+        marker.setLatLng([clickLat, clickLng]);
+        const addr = await geocodeReverse(clickLng, clickLat);
+        if (!cancelled) {
+          updateValue(addr, clickLat, clickLng);
+          setSearchQuery(addr);
+        }
+      });
 
       mapRef.current = map;
+
+      setTimeout(() => map.invalidateSize(), 100);
+
       if (!cancelled) setMapReady(true);
     }
 
@@ -140,7 +137,7 @@ export function YandexMapPicker({ defaultValue, onChange }: YandexMapPickerProps
     return () => {
       cancelled = true;
       if (mapRef.current) {
-        try { mapRef.current.destroy(); } catch {}
+        try { mapRef.current.remove(); } catch {}
         mapRef.current = null;
       }
     };
@@ -170,8 +167,8 @@ export function YandexMapPicker({ defaultValue, onChange }: YandexMapPickerProps
     setShowSuggestions(false);
     updateValue(item.address, item.lat, item.lon);
     if (markerRef.current && mapRef.current) {
-      markerRef.current.update({ coordinates: [item.lon, item.lat] });
-      mapRef.current.setLocation({ center: [item.lon, item.lat], zoom: 16, duration: 300 });
+      markerRef.current.setLatLng([item.lat, item.lon]);
+      mapRef.current.setView([item.lat, item.lon], 16, { animate: true });
     }
   };
 
@@ -186,7 +183,9 @@ export function YandexMapPicker({ defaultValue, onChange }: YandexMapPickerProps
   }, []);
 
   return (
-    <div className="space-y-3 min-w-0 overflow-hidden">
+    <div className="space-y-3 min-w-0">
+      <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
       <div className="space-y-1.5">
         <Label>Адрес</Label>
         <div className="relative z-[60]" ref={suggestionsRef}>
@@ -197,7 +196,7 @@ export function YandexMapPicker({ defaultValue, onChange }: YandexMapPickerProps
               onChange={(e) => handleSearchInput(e.target.value)}
               onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
               placeholder="Введите адрес для поиска..."
-              className="pl-9 pr-9 truncate"
+              className="pl-9 pr-9"
             />
             {searching && (
               <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground animate-spin" />
@@ -214,7 +213,7 @@ export function YandexMapPicker({ defaultValue, onChange }: YandexMapPickerProps
                   onClick={() => handleSuggestionClick(item)}
                 >
                   <MapPin className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
-                  <span>{item.address}</span>
+                  <span className="break-words">{item.address}</span>
                 </button>
               ))}
             </div>
@@ -227,6 +226,7 @@ export function YandexMapPicker({ defaultValue, onChange }: YandexMapPickerProps
         <div
           ref={mapContainerRef}
           className="w-full h-[300px] rounded-lg border border-border overflow-hidden bg-muted"
+          style={{ zIndex: 0 }}
         />
         {!mapReady && (
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -238,7 +238,7 @@ export function YandexMapPicker({ defaultValue, onChange }: YandexMapPickerProps
 
       {address && (
         <div className="rounded-lg bg-muted/50 border border-border p-3 space-y-1">
-          <p className="text-sm font-medium truncate">{address}</p>
+          <p className="text-sm font-medium break-words">{address}</p>
           <p className="text-xs text-muted-foreground font-mono">
             {latitude.toFixed(6)}, {longitude.toFixed(6)}
           </p>

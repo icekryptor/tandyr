@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
         format: 'json',
         addressdetails: '1',
         limit: '5',
-        countrycodes: 'ru',
+        countrycodes: 'ru,kz',
         'accept-language': 'ru',
       });
 

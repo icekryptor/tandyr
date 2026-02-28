@@ -2,39 +2,28 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Eye, MapPin } from 'lucide-react';
-import { formatDateTime, formatKg } from '@tandyr/shared';
-import type { Store } from '@tandyr/shared';
+import { formatDateTime, formatKg, SHIFT_STATUS_LABELS } from '@tandyr/shared';
+import type { Shift, Store } from '@tandyr/shared';
 
-interface Shift {
-  id: string;
-  start_time: string;
-  end_time: string | null;
-  status: string;
-  production_kg: number | null;
-  start_photo_url: string;
-  end_photo_url: string | null;
-  start_lat: number;
-  start_lng: number;
-  user: { full_name: string; email: string } | null;
-  store: { name: string } | null;
-}
+type ShiftRow = Shift & {
+  user: { id: string; full_name: string; email: string } | null;
+  store: { id: string; name: string } | null;
+};
 
 export function ShiftsClient({
   shifts,
   stores,
 }: {
-  shifts: Shift[];
+  shifts: ShiftRow[];
   stores: Pick<Store, 'id' | 'name'>[];
 }) {
   const router = useRouter();
-  const [selectedShift, setSelectedShift] = useState<Shift | null>(null);
   const [storeFilter, setStoreFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState('');
@@ -74,8 +63,9 @@ export function ShiftsClient({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Все статусы</SelectItem>
-            <SelectItem value="open">Открыта</SelectItem>
-            <SelectItem value="closed">Закрыта</SelectItem>
+            {Object.entries(SHIFT_STATUS_LABELS).map(([k, v]) => (
+              <SelectItem key={k} value={k}>{v}</SelectItem>
+            ))}
           </SelectContent>
         </Select>
 
@@ -94,136 +84,89 @@ export function ShiftsClient({
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/40">
+              <TableHead className="w-16">№</TableHead>
               <TableHead>Сотрудник</TableHead>
               <TableHead>Магазин</TableHead>
-              <TableHead>Начало</TableHead>
-              <TableHead>Конец</TableHead>
+              <TableHead>Открытие</TableHead>
+              <TableHead>Закрытие</TableHead>
               <TableHead>Статус</TableHead>
               <TableHead>Выработка</TableHead>
-              <TableHead className="text-right">Детали</TableHead>
+              <TableHead>К перечислению</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {shifts.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center text-muted-foreground py-10">
+                <TableCell colSpan={8} className="text-center text-muted-foreground py-10">
                   Нет смен
                 </TableCell>
               </TableRow>
             ) : (
-              shifts.map((shift) => (
-                <TableRow key={shift.id}>
-                  <TableCell>
-                    <p className="font-medium text-sm">{shift.user?.full_name ?? '—'}</p>
-                    <p className="text-xs text-muted-foreground">{shift.user?.email}</p>
-                  </TableCell>
-                  <TableCell className="text-sm">{shift.store?.name ?? '—'}</TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {formatDateTime(shift.start_time)}
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {shift.end_time ? formatDateTime(shift.end_time) : '—'}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={shift.status === 'open' ? 'default' : 'secondary'}
-                      className={shift.status === 'open' ? 'bg-green-100 text-green-700 hover:bg-green-100' : ''}>
-                      {shift.status === 'open' ? 'Открыта' : 'Закрыта'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-sm">
-                    {shift.production_kg ? formatKg(shift.production_kg) : '—'}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => setSelectedShift(shift)}
-                    >
-                      <Eye className="h-3.5 w-3.5" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))
+              shifts.map((shift) => {
+                const net = (shift.accrual ?? 0) - (shift.fine ?? 0);
+                const hasFinance = shift.accrual != null || shift.fine != null;
+                return (
+                  <TableRow key={shift.id} className="cursor-pointer hover:bg-muted/30">
+                    <TableCell>
+                      <Link href={`/shifts/${shift.id}`} className="block font-mono text-xs text-muted-foreground">
+                        #{shift.shift_number ?? shift.id.slice(0, 4).toUpperCase()}
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      <Link href={`/shifts/${shift.id}`} className="block">
+                        <p className="font-medium text-sm">{shift.user?.full_name ?? '—'}</p>
+                        <p className="text-xs text-muted-foreground">{shift.user?.email}</p>
+                      </Link>
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      <Link href={`/shifts/${shift.id}`} className="block">
+                        {shift.store?.name ?? '—'}
+                      </Link>
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      <Link href={`/shifts/${shift.id}`} className="block">
+                        {formatDateTime(shift.start_time)}
+                      </Link>
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      <Link href={`/shifts/${shift.id}`} className="block">
+                        {shift.end_time ? formatDateTime(shift.end_time) : '—'}
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      <Link href={`/shifts/${shift.id}`} className="block">
+                        <Badge
+                          className={
+                            shift.status === 'open'
+                              ? 'bg-green-100 text-green-700 hover:bg-green-100'
+                              : 'bg-muted text-muted-foreground hover:bg-muted'
+                          }
+                        >
+                          {SHIFT_STATUS_LABELS[shift.status] ?? shift.status}
+                        </Badge>
+                      </Link>
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      <Link href={`/shifts/${shift.id}`} className="block">
+                        {shift.production_kg ? formatKg(shift.production_kg) : '—'}
+                      </Link>
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      <Link href={`/shifts/${shift.id}`} className="block">
+                        {hasFinance ? (
+                          <span className={net >= 0 ? 'text-blue-700 font-medium' : 'text-orange-600 font-medium'}>
+                            {net.toLocaleString('ru-RU')} ₽
+                          </span>
+                        ) : '—'}
+                      </Link>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
             )}
           </TableBody>
         </Table>
       </div>
-
-      {/* Shift detail dialog */}
-      <Dialog open={!!selectedShift} onOpenChange={(open) => { if (!open) setSelectedShift(null); }}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Детали смены</DialogTitle>
-          </DialogHeader>
-          {selectedShift && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <p className="text-muted-foreground text-xs">Сотрудник</p>
-                  <p className="font-medium mt-0.5">{selectedShift.user?.full_name}</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground text-xs">Магазин</p>
-                  <p className="font-medium mt-0.5">{selectedShift.store?.name}</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground text-xs">Начало</p>
-                  <p className="font-medium mt-0.5">{formatDateTime(selectedShift.start_time)}</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground text-xs">Конец</p>
-                  <p className="font-medium mt-0.5">
-                    {selectedShift.end_time ? formatDateTime(selectedShift.end_time) : '—'}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground text-xs">Выработка</p>
-                  <p className="font-medium mt-0.5">
-                    {selectedShift.production_kg ? formatKg(selectedShift.production_kg) : '—'}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground text-xs">ID смены</p>
-                  <p className="font-mono text-xs mt-0.5">{selectedShift.id.slice(0, 8).toUpperCase()}</p>
-                </div>
-              </div>
-
-              <div>
-                <p className="text-muted-foreground text-xs flex items-center gap-1 mb-2">
-                  <MapPin className="h-3 w-3" />
-                  Геолокация начала
-                </p>
-                <p className="text-xs font-mono bg-muted rounded px-2 py-1">
-                  {selectedShift.start_lat.toFixed(6)}, {selectedShift.start_lng.toFixed(6)}
-                </p>
-              </div>
-
-              {selectedShift.start_photo_url && (
-                <div>
-                  <p className="text-muted-foreground text-xs mb-2">Фото начала смены</p>
-                  <img
-                    src={selectedShift.start_photo_url}
-                    alt="Начало смены"
-                    className="w-full rounded-xl object-cover max-h-48"
-                  />
-                </div>
-              )}
-
-              {selectedShift.end_photo_url && (
-                <div>
-                  <p className="text-muted-foreground text-xs mb-2">Фото конца смены</p>
-                  <img
-                    src={selectedShift.end_photo_url}
-                    alt="Конец смены"
-                    className="w-full rounded-xl object-cover max-h-48"
-                  />
-                </div>
-              )}
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

@@ -14,10 +14,13 @@ import { supabase } from '../../lib/supabase';
 import type { Shift } from '../../lib/shared/types';
 import { formatDateTime } from '../../lib/shared/utils';
 
+type PendingAct = { id: string; scheduled_date: string; week_number: number; week_year: number };
+
 export default function HomeScreen() {
   const { user } = useAuthStore();
   const { activeShift, setActiveShift } = useShiftStore();
   const [refreshing, setRefreshing] = useState(false);
+  const [pendingAct, setPendingAct] = useState<PendingAct | null>(null);
 
   const fetchActiveShift = async () => {
     if (!user) return;
@@ -32,13 +35,27 @@ export default function HomeScreen() {
     setActiveShift(data as Shift | null);
   };
 
+  const fetchPendingAct = async () => {
+    if (!user) return;
+    const { data } = await supabase
+      .from('inventory_acts')
+      .select('id, scheduled_date, week_number, week_year')
+      .eq('user_id', user.id)
+      .in('status', ['pending', 'overdue'])
+      .order('scheduled_date', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    setPendingAct(data ?? null);
+  };
+
   useEffect(() => {
     fetchActiveShift();
+    fetchPendingAct();
   }, [user]);
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await fetchActiveShift();
+    await Promise.all([fetchActiveShift(), fetchPendingAct()]);
     setRefreshing(false);
   };
 
@@ -139,6 +156,28 @@ export default function HomeScreen() {
               </Text>
             </TouchableOpacity>
           </View>
+        )}
+
+        {/* Inventory act banner */}
+        {pendingAct && (
+          <TouchableOpacity
+            className="bg-orange-50 border border-orange-200 rounded-2xl p-4"
+            onPress={() => router.push({ pathname: '/(app)/inventory-act', params: { actId: pendingAct.id } })}
+            activeOpacity={0.8}
+          >
+            <View className="flex-row items-start gap-3">
+              <Text className="text-2xl">📋</Text>
+              <View className="flex-1">
+                <Text className="text-orange-700 text-sm" style={{ fontFamily: 'Manrope_700Bold' }}>
+                  Проведите инвентаризацию
+                </Text>
+                <Text className="text-orange-600 text-xs mt-0.5" style={{ fontFamily: 'Manrope_400Regular' }}>
+                  Неделя {pendingAct.week_number}, {pendingAct.week_year} · Нажмите для заполнения
+                </Text>
+              </View>
+              <Text className="text-orange-400 text-lg">→</Text>
+            </View>
+          </TouchableOpacity>
         )}
 
         {/* Action buttons */}

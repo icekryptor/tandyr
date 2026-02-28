@@ -4,17 +4,7 @@
 // Cron: "0 5,10 * * *" (UTC, adjust for your timezone)
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-
-const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
-
-interface PushMessage {
-  to: string;
-  title: string;
-  body: string;
-  data?: Record<string, unknown>;
-  sound?: string;
-  priority?: string;
-}
+import { buildMessages, sendPushBatch } from '../_shared/push.ts';
 
 Deno.serve(async (_req) => {
   const supabase = createClient(
@@ -37,40 +27,17 @@ Deno.serve(async (_req) => {
     return new Response(JSON.stringify({ message: 'No open shifts' }), { status: 200 });
   }
 
-  // Build push messages
-  const messages: PushMessage[] = openShifts.map((shift: any) => ({
-    to: shift.users.push_token,
-    title: 'Промежуточный прогресс 📊',
-    body: 'Укажите сколько кг продукции готово на данный момент',
-    data: { screen: 'progress' },
-    sound: 'default',
-    priority: 'high',
-  }));
-
-  // Send via Expo Push API (batches of 100)
-  const batches: PushMessage[][] = [];
-  for (let i = 0; i < messages.length; i += 100) {
-    batches.push(messages.slice(i, i + 100));
-  }
-
-  const results = await Promise.allSettled(
-    batches.map((batch) =>
-      fetch(EXPO_PUSH_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-          'Accept-Encoding': 'gzip, deflate',
-        },
-        body: JSON.stringify(batch),
-      }),
-    ),
+  const messages = buildMessages(
+    openShifts.map((s: any) => ({ push_token: s.users.push_token })),
+    'Промежуточный прогресс 📊',
+    'Укажите сколько кг продукции готово на данный момент',
+    { screen: 'progress' },
   );
 
-  const sent = results.filter((r) => r.status === 'fulfilled').length * 100;
+  const { sent, failed } = await sendPushBatch(messages);
 
   return new Response(
-    JSON.stringify({ message: `Sent notifications to ~${Math.min(sent, messages.length)} users` }),
+    JSON.stringify({ message: `Sent: ${sent}, failed: ${failed}`, total: messages.length }),
     { status: 200, headers: { 'Content-Type': 'application/json' } },
   );
 });

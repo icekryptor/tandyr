@@ -11,6 +11,7 @@ import {
   Package,
   MessageSquare,
   Wrench,
+  Settings,
   LogOut,
   ChevronRight,
 } from 'lucide-react';
@@ -18,7 +19,7 @@ import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
 
 const navItems = [
-  { href: '/', label: 'Главная', icon: LayoutDashboard },
+  { href: '/overview', label: 'Главная', icon: LayoutDashboard },
   { href: '/employees', label: 'Сотрудники', icon: Users },
   { href: '/stores', label: 'Магазины', icon: Store },
   { href: '/shifts', label: 'Смены', icon: Calendar },
@@ -26,6 +27,7 @@ const navItems = [
   { href: '/inventory', label: 'Инвентарь и поставки', icon: Package },
   { href: '/chats', label: 'Чаты', icon: MessageSquare },
   { href: '/tech-requests', label: 'Техзаявки', icon: Wrench },
+  { href: '/settings', label: 'Настройки', icon: Settings },
 ];
 
 export function Sidebar() {
@@ -57,7 +59,7 @@ export function Sidebar() {
       {/* Navigation */}
       <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
         {navItems.map(({ href, label, icon: Icon }) => {
-          const isActive = href === '/' ? pathname === '/' : pathname.startsWith(href);
+          const isActive = pathname === href || (href !== '/overview' && pathname.startsWith(href));
           return (
             <Link
               key={href}
