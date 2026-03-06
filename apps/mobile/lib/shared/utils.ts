@@ -33,7 +33,7 @@ export function formatKg(value: number): string {
 }
 
 export function formatCurrency(value: number): string {
-  return value.toLocaleString('ru-RU', { style: 'currency', currency: 'KZT', maximumFractionDigits: 0 });
+  return value.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 });
 }
 
 export function formatDate(iso: string): string {
