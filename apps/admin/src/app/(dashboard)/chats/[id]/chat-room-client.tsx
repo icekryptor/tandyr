@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
   ArrowLeft, Send, Paperclip, Pencil, Trash2,
-  Check, X, ImageIcon, Film,
+  Check, X,
 } from 'lucide-react';
 import { sendMessage, editMessage, deleteMessage, uploadChatMedia } from '../actions';
 import { formatDateTime } from '@tandyr/shared';
@@ -179,17 +179,18 @@ export function ChatRoomClient({
         'postgres_changes',
         { event: '*', schema: 'public', table: 'messages', filter: `room_id=eq.${room.id}` },
         async (payload) => {
+          const newRow = payload.new as MessageRow;
           if (payload.eventType === 'INSERT') {
             // Fetch with user join
             const { data } = await supabase
               .from('messages')
               .select('*, user:users(id, full_name, avatar_url)')
-              .eq('id', (payload.new as any).id)
+              .eq('id', newRow.id)
               .single();
             if (data) setMessages((prev) => [...prev.filter(m => m.id !== data.id), data]);
           } else if (payload.eventType === 'UPDATE') {
             setMessages((prev) =>
-              prev.map((m) => m.id === (payload.new as any).id ? { ...m, ...(payload.new as any) } : m)
+              prev.map((m) => m.id === newRow.id ? { ...m, ...newRow } : m)
             );
           }
         }

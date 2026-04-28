@@ -2,7 +2,26 @@ import { NextRequest, NextResponse } from 'next/server';
 
 const NOMINATIM_URL = 'https://nominatim.openstreetmap.org';
 
-function formatAddress(item: any): string {
+interface NominatimAddress {
+  road?: string;
+  house_number?: string;
+  suburb?: string;
+  city_district?: string;
+  city?: string;
+  town?: string;
+  village?: string;
+  state?: string;
+  postcode?: string;
+}
+
+interface NominatimItem {
+  display_name: string;
+  lon: string;
+  lat: string;
+  address?: NominatimAddress;
+}
+
+function formatAddress(item: NominatimItem): string {
   const addr = item.address;
   if (!addr) return item.display_name;
 
@@ -57,8 +76,8 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: `Nominatim error: ${res.status}` }, { status: res.status });
       }
 
-      const data = await res.json();
-      const results = data.map((item: any) => ({
+      const data = (await res.json()) as NominatimItem[];
+      const results = data.map((item) => ({
         address: formatAddress(item),
         lon: parseFloat(item.lon),
         lat: parseFloat(item.lat),
@@ -80,14 +99,15 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: `Nominatim error: ${res.status}` }, { status: res.status });
       }
 
-      const data = await res.json();
+      const data = (await res.json()) as NominatimItem;
       const results = data.display_name
         ? [{ address: formatAddress(data), lon: parseFloat(data.lon), lat: parseFloat(data.lat) }]
         : [];
 
       return NextResponse.json({ results });
     }
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

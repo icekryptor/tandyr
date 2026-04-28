@@ -43,8 +43,8 @@ async function geocodeReverse(lon: number, lat: number): Promise<string> {
 
 export function YandexMapPicker({ defaultValue, onChange }: YandexMapPickerProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<any>(null);
-  const markerRef = useRef<any>(null);
+  const mapRef = useRef<import('leaflet').Map | null>(null);
+  const markerRef = useRef<import('leaflet').Marker | null>(null);
   const leafletRef = useRef<typeof import('leaflet') | null>(null);
 
   const [searchQuery, setSearchQuery] = useState(defaultValue?.address || '');
@@ -116,7 +116,7 @@ export function YandexMapPicker({ defaultValue, onChange }: YandexMapPickerProps
         }
       });
 
-      map.on('click', async (e: any) => {
+      map.on('click', async (e: import('leaflet').LeafletMouseEvent) => {
         const { lat: clickLat, lng: clickLng } = e.latlng;
         marker.setLatLng([clickLat, clickLng]);
         const addr = await geocodeReverse(clickLng, clickLat);
@@ -141,6 +141,8 @@ export function YandexMapPicker({ defaultValue, onChange }: YandexMapPickerProps
         mapRef.current = null;
       }
     };
+    // Map must initialize once on mount; defaultValue/updateValue are only consulted at init time
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleSearchInput = (value: string) => {

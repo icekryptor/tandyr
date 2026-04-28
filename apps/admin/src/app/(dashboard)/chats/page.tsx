@@ -26,14 +26,16 @@ export default async function AdminChatsPage() {
   ]);
 
   // Sort last_message by created_at desc per room (Supabase returns array)
-  const roomsWithLastMsg = (rooms ?? []).map((r: any) => ({
+  type LastMessage = { content: string; media_type: string | null; created_at: string; user: { full_name: string } | null };
+  type RawRoom = Record<string, unknown> & { last_message?: LastMessage[] | null };
+  const roomsWithLastMsg = ((rooms ?? []) as RawRoom[]).map((r) => ({
     ...r,
     last_message: r.last_message?.length
-      ? r.last_message.sort((a: any, b: any) =>
+      ? [...r.last_message].sort((a, b) =>
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         )[0]
       : null,
-  }));
+  })) as Parameters<typeof ChatsAdminClient>[0]['rooms'];
 
   return <ChatsAdminClient rooms={roomsWithLastMsg} employees={employees ?? []} />;
 }

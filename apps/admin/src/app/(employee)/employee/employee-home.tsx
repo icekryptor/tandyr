@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -21,11 +22,23 @@ import { startShift, endShift, submitProgress, submitTechRequest } from './actio
 
 type Screen = 'home' | 'start-shift' | 'end-shift' | 'progress' | 'tech-request';
 
+type EmployeeProfile = { full_name: string | null; email: string };
+type ShiftRow = {
+  id: string;
+  status: string;
+  created_at: string;
+  started_at: string;
+  store_id: string;
+  production_kg: number | null;
+  store: { name: string; address?: string | null } | null;
+};
+type StoreOption = { id: string; name: string; address?: string | null };
+
 interface Props {
-  profile: any;
-  openShift: any;
-  stores: any[];
-  recentShifts: any[];
+  profile: EmployeeProfile | null;
+  openShift: ShiftRow | null;
+  stores: StoreOption[];
+  recentShifts: ShiftRow[];
 }
 
 export function EmployeeHome({ profile, openShift, stores, recentShifts }: Props) {
@@ -306,7 +319,7 @@ export function EmployeeHome({ profile, openShift, stores, recentShifts }: Props
           </div>
           <ChevronRight className="h-4 w-4 text-muted-foreground" />
         </button>
-        <a
+        <Link
           href="/chats"
           className="col-span-2 flex items-center justify-between p-4 rounded-2xl border border-border hover:bg-muted/50 transition-colors"
         >
@@ -320,7 +333,7 @@ export function EmployeeHome({ profile, openShift, stores, recentShifts }: Props
             </div>
           </div>
           <ChevronRight className="h-4 w-4 text-muted-foreground" />
-        </a>
+        </Link>
       </div>
 
       {/* Recent shifts */}
@@ -328,7 +341,7 @@ export function EmployeeHome({ profile, openShift, stores, recentShifts }: Props
         <div>
           <h2 className="text-sm font-semibold text-foreground mb-3">Последние смены</h2>
           <div className="space-y-2">
-            {recentShifts.map((shift: any) => (
+            {recentShifts.map((shift) => (
               <div key={shift.id} className="flex items-center justify-between p-3 rounded-xl bg-card border border-border">
                 <div className="flex items-center gap-2.5">
                   <div className={`w-2 h-2 rounded-full ${shift.status === 'open' ? 'bg-green-500' : 'bg-muted-foreground/40'}`} />

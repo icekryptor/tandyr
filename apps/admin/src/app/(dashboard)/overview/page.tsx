@@ -66,7 +66,8 @@ function BarChart({ data }: { data: { label: string; value: number }[] }) {
 export default async function DashboardPage() {
   const supabase = await createClient();
 
-  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const now = new Date();
+  const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
   const [
     { count: employeeCount },
@@ -109,8 +110,9 @@ export default async function DashboardPage() {
   const shiftKgRate = settings.shift_kg_rate ?? 300;
 
   // Weekly production total
+  type ProductionRow = { production_kg: number | null; created_at: string };
   const weeklyProduction = (productionData ?? []).reduce(
-    (sum: number, s: any) => sum + (s.production_kg ?? 0), 0,
+    (sum: number, s: ProductionRow) => sum + (s.production_kg ?? 0), 0,
   );
 
   // Revenue
@@ -122,11 +124,11 @@ export default async function DashboardPage() {
   const weeklySalary = weeklyShiftCount * shiftBaseRate + weeklyKgBonus;
 
   // Build chart: last 7 days
-  const days = Array.from({ length: 7 }, (_, i) => subDays(startOfDay(new Date()), 6 - i));
+  const days = Array.from({ length: 7 }, (_, i) => subDays(startOfDay(now), 6 - i));
   const chartData = days.map((day) => {
     const dayProd = (productionData ?? [])
-      .filter((s: any) => isSameDay(new Date(s.created_at), day))
-      .reduce((sum: number, s: any) => sum + (s.production_kg ?? 0), 0);
+      .filter((s: ProductionRow) => isSameDay(new Date(s.created_at), day))
+      .reduce((sum: number, s: ProductionRow) => sum + (s.production_kg ?? 0), 0);
     return {
       label: format(day, 'EEE', { locale: ru }).slice(0, 2),
       value: dayProd,
@@ -134,9 +136,14 @@ export default async function DashboardPage() {
   });
 
   // Critical resources: days < 7
+  type StoreWithResources = {
+    id: string;
+    name: string;
+    resources?: { resource: string; quantity_kg: number | null }[] | null;
+  };
   const criticalStores: { storeId: string; storeName: string; resource: string; days: number }[] = [];
-  for (const store of storesWithResources ?? []) {
-    for (const res of (store as any).resources ?? []) {
+  for (const store of (storesWithResources ?? []) as StoreWithResources[]) {
+    for (const res of store.resources ?? []) {
       const d = getResourceDays(res.resource, res.quantity_kg ?? 0, settings);
       if (d !== null && d < 7) {
         criticalStores.push({
@@ -274,7 +281,7 @@ export default async function DashboardPage() {
                 <span className="text-sm">Нет данных о сменах</span>
               </div>
             ) : (
-              (recentShifts ?? []).map((shift: any) => (
+              (recentShifts ?? []).map((shift: { id: string; status: string; production_kg: number | null; user: { full_name: string } | null; store: { name: string } | null }) => (
                 <div key={shift.id} className="flex items-center justify-between px-6 py-3">
                   <div className="flex items-center gap-3">
                     <div className={`w-2 h-2 rounded-full ${shift.status === 'open' ? 'bg-green-500' : 'bg-muted-foreground'}`} />

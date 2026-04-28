@@ -15,7 +15,7 @@ import {
   Wrench, AlertTriangle, Clock, DollarSign,
 } from 'lucide-react';
 import {
-  updateTechRequestStatus, takeIntoWork, setDeadline, resolveRequest,
+  takeIntoWork, setDeadline, resolveRequest,
 } from './actions';
 import { formatDateTime, TECH_REQUEST_STATUS_LABELS, TECH_REQUEST_STATUS_COLORS } from '@tandyr/shared';
 import type { TechRequest } from '@tandyr/shared';

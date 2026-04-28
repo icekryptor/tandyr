@@ -25,7 +25,7 @@ export default async function EmployeeDetailPage({ params }: { params: Promise<{
 
   if (!employee) notFound();
 
-  const assignedCityIds = (userCities ?? []).map((r: any) => r.city_id);
+  const assignedCityIds = (userCities ?? []).map((r) => r.city_id as string);
 
   return (
     <EmployeeDetailClient

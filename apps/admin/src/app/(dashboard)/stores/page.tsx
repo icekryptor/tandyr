@@ -6,12 +6,13 @@ import { StoresClient } from './stores-client';
 export default async function StoresPage() {
   const supabase = await createClient();
 
-  let { data: stores, error } = await supabase
+  const initial = await supabase
     .from('stores')
     .select('*, resources:store_resources(*)')
     .order('name');
 
-  if (error) {
+  let stores = initial.data;
+  if (initial.error) {
     const fallback = await supabase.from('stores').select('*').order('name');
     stores = fallback.data;
   }

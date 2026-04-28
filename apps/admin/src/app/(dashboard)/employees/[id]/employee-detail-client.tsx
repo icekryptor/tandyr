@@ -11,8 +11,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import {
   ArrowLeft, Pencil, UserX, UserCheck, Hash,
   Phone, Mail, MapPin, CreditCard, FileText,
-  Calendar, Globe, BadgeAlert, Upload, ExternalLink,
-  Building2, Banknote, ShieldAlert,
+  Calendar, BadgeAlert, Upload, ExternalLink,
+  Building2, ShieldAlert,
 } from 'lucide-react';
 import { updateEmployee, updateEmployeePassword, deleteEmployee, uploadEmployeeFile, updateEmployeeCities } from '../actions';
 import {
@@ -281,11 +281,11 @@ export function EmployeeDetailClient({ employee, stores, cities, assignedCityIds
               </div>
             </div>
 
-            {(employee as any).store && (
+            {employee.store && (
               <div className="mt-3 flex items-center gap-1.5 text-sm">
                 <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
-                <Link href={`/stores/${(employee as any).store.id}`} className="text-primary hover:underline">
-                  {(employee as any).store.name}
+                <Link href={`/stores/${employee.store.id}`} className="text-primary hover:underline">
+                  {employee.store.name}
                 </Link>
               </div>
             )}
@@ -424,7 +424,7 @@ export function EmployeeDetailClient({ employee, stores, cities, assignedCityIds
                 </div>
                 <div className="space-y-1.5">
                   <Label>Магазин</Label>
-                  <select name="store_id" defaultValue={(employee as any).store?.id ?? ''} className={sel}>
+                  <select name="store_id" defaultValue={employee.store?.id ?? ''} className={sel}>
                     <option value="">— Не назначен —</option>
                     {stores.map((s) => (
                       <option key={s.id} value={s.id}>{s.name}</option>

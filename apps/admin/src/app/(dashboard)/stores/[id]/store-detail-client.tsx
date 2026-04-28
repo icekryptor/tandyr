@@ -59,8 +59,8 @@ export function StoreDetailClient({ store, users, settings = {} }: { store: Stor
     });
   };
 
-  const managerName = (store as any).manager?.full_name ?? null;
-  const techName = (store as any).tech_specialist?.full_name ?? null;
+  const managerName = store.manager?.full_name ?? null;
+  const techName = store.tech_specialist?.full_name ?? null;
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
