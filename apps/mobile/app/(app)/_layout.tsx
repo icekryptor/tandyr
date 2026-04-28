@@ -21,6 +21,9 @@ export default function AppLayout() {
       <Stack.Screen name="chats" />
       <Stack.Screen name="chat/[id]" />
       <Stack.Screen name="progress" />
+      <Stack.Screen name="inventory-act" />
+      <Stack.Screen name="salary" />
+      <Stack.Screen name="profile" />
     </Stack>
   );
 }

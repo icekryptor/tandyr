@@ -6,6 +6,7 @@ import {
   ScrollView,
   Alert,
   RefreshControl,
+  Image,
 } from 'react-native';
 import { router } from 'expo-router';
 import { useAuthStore } from '../../store/auth';
@@ -59,20 +60,6 @@ export default function HomeScreen() {
     setRefreshing(false);
   };
 
-  const handleLogout = () => {
-    Alert.alert('Выход', 'Вы уверены, что хотите выйти?', [
-      { text: 'Отмена', style: 'cancel' },
-      {
-        text: 'Выйти',
-        style: 'destructive',
-        onPress: async () => {
-          await supabase.auth.signOut();
-          router.replace('/(auth)/login');
-        },
-      },
-    ]);
-  };
-
   const greeting = () => {
     const hour = new Date().getHours();
     if (hour < 12) return 'Доброе утро';
@@ -98,12 +85,27 @@ export default function HomeScreen() {
             </Text>
           </View>
           <TouchableOpacity
-            onPress={handleLogout}
-            className="bg-white/20 rounded-xl px-3 py-2"
+            onPress={() => router.push('/(app)/profile')}
+            className="w-11 h-11 rounded-full bg-white/20 items-center justify-center overflow-hidden"
+            activeOpacity={0.8}
           >
-            <Text className="text-white text-sm" style={{ fontFamily: 'Manrope_500Medium' }}>
-              Выйти
-            </Text>
+            {user?.avatar_url ? (
+              <Image
+                source={{ uri: user.avatar_url }}
+                style={{ width: 44, height: 44 }}
+                resizeMode="cover"
+              />
+            ) : (
+              <Text className="text-white" style={{ fontFamily: 'Manrope_700Bold' }}>
+                {(user?.full_name ?? '?')
+                  .split(' ')
+                  .filter(Boolean)
+                  .slice(0, 2)
+                  .map((s) => s[0])
+                  .join('')
+                  .toUpperCase() || '?'}
+              </Text>
+            )}
           </TouchableOpacity>
         </View>
       </View>
@@ -237,6 +239,26 @@ export default function HomeScreen() {
             </Text>
           </TouchableOpacity>
         </View>
+
+        {/* Salary row */}
+        <TouchableOpacity
+          className="bg-white rounded-2xl p-4 border border-border flex-row items-center gap-3"
+          onPress={() => router.push('/(app)/salary')}
+          activeOpacity={0.8}
+        >
+          <View className="w-12 h-12 rounded-2xl bg-primary/10 items-center justify-center">
+            <Text className="text-2xl">💰</Text>
+          </View>
+          <View className="flex-1">
+            <Text className="text-gray-900 text-base" style={{ fontFamily: 'Manrope_700Bold' }}>
+              Моя зарплата
+            </Text>
+            <Text className="text-muted text-xs mt-0.5" style={{ fontFamily: 'Manrope_400Regular' }}>
+              Заработок по неделям и история выплат
+            </Text>
+          </View>
+          <Text className="text-muted text-lg">→</Text>
+        </TouchableOpacity>
 
         {/* Shift ID info */}
         {activeShift && (

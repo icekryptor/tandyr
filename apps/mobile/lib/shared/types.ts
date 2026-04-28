@@ -6,6 +6,8 @@ export type TechRequestStatus = 'pending' | 'in_progress' | 'resolved';
 
 export type SalaryStatus = 'calculated' | 'paid';
 
+export type WeeklySalaryStatus = 'pending' | 'paid';
+
 export type ChatRoomType = 'direct' | 'group';
 
 export interface User {
@@ -100,6 +102,27 @@ export interface SalaryRecord {
   status: SalaryStatus;
   created_at: string;
   user?: User;
+}
+
+export interface WeeklySalary {
+  id: string;
+  user_id: string;
+  week_number: number;
+  week_year: number;
+  period_start: string;
+  period_end: string;
+  shift_count: number;
+  total_kg: number;
+  accrual_kg: number;
+  accrual_shift: number;
+  total_accrual: number;
+  fines_total: number;
+  current_debt: number;
+  transferred: number | null;
+  debt_written_off: number | null;
+  status: WeeklySalaryStatus;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface InventoryItem {
