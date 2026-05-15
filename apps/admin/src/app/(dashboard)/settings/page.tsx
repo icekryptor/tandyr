@@ -19,11 +19,14 @@ export default async function SettingsPage() {
   // Use admin client to check role (bypasses RLS)
   const { data: me } = await admin
     .from('users')
-    .select('company_role')
+    .select('role, company_role')
     .eq('id', user.id)
     .single();
 
-  if (!me || !['owner', 'admin'].includes(me.company_role ?? '')) {
+  // System admins always have access; otherwise gate on business role
+  const isSystemAdmin = me?.role === 'admin';
+  const isBusinessAdmin = ['owner', 'admin'].includes(me?.company_role ?? '');
+  if (!me || (!isSystemAdmin && !isBusinessAdmin)) {
     redirect('/');
   }
 

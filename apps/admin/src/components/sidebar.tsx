@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
@@ -18,6 +19,24 @@ import {
 import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
 
+type SidebarProfile = {
+  full_name: string | null;
+  email: string | null;
+  phone: string | null;
+  avatar_url: string | null;
+};
+
+function getInitials(name: string | null | undefined): string {
+  if (!name) return '?';
+  return name
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((s) => s[0])
+    .join('')
+    .toUpperCase() || '?';
+}
+
 const navItems = [
   { href: '/overview', label: 'Главная', icon: LayoutDashboard },
   { href: '/employees', label: 'Сотрудники', icon: Users },
@@ -33,6 +52,24 @@ const navItems = [
 export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
+  const [profile, setProfile] = useState<SidebarProfile | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user || cancelled) return;
+      const { data } = await supabase
+        .from('users')
+        .select('full_name, email, phone, avatar_url')
+        .eq('id', user.id)
+        .single();
+      if (!cancelled && data) setProfile(data as SidebarProfile);
+    };
+    load();
+    return () => { cancelled = true; };
+  }, []);
 
   const handleLogout = async () => {
     const supabase = createClient();
@@ -78,6 +115,36 @@ export function Sidebar() {
           );
         })}
       </nav>
+
+      {/* Profile preview */}
+      {profile && (
+        <div className="px-3 pt-3 border-t border-border">
+          <div className="flex items-center gap-3 px-2 py-2 rounded-xl">
+            <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0 overflow-hidden">
+              {profile.avatar_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={profile.avatar_url}
+                  alt={profile.full_name ?? ''}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <span className="text-primary text-xs font-bold">
+                  {getInitials(profile.full_name)}
+                </span>
+              )}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-foreground truncate">
+                {profile.full_name ?? 'Без имени'}
+              </p>
+              <p className="text-[11px] text-muted-foreground truncate">
+                {profile.phone ?? profile.email ?? ''}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Logout */}
       <div className="p-3 border-t border-border">
