@@ -19,6 +19,10 @@ out/
 *.swo
 .DS_Store
 
+# Claude Code / agent artifacts
+.claude/
+.playwright-mcp/
+
 # Expo
 apps/mobile/.expo/
 apps/mobile/ios/

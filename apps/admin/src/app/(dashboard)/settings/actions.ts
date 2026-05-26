@@ -6,9 +6,13 @@ import { createClient } from '@/lib/supabase/server';
 export async function saveSettings(data: Record<string, string>) {
   const supabase = await createClient();
 
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: 'Не авторизованы' };
+
   const { data: me } = await supabase
     .from('users')
     .select('role, company_role')
+    .eq('id', user.id)
     .single();
 
   const isSystemAdmin = me?.role === 'admin';

@@ -40,21 +40,33 @@ export async function signUpAdmin(formData: FormData): Promise<Result> {
     user_metadata: { full_name: fullName },
   });
   if (createErr || !created.user) {
-    return { ok: false, error: createErr?.message ?? 'Не удалось создать аккаунт.' };
+    const raw = createErr?.message ?? '';
+    if (/already/i.test(raw) || /exists/i.test(raw) || /registered/i.test(raw)) {
+      return { ok: false, error: 'Аккаунт с таким email уже зарегистрирован. Попробуйте войти.' };
+    }
+    return { ok: false, error: raw || 'Не удалось создать аккаунт.' };
   }
 
-  // Insert public.users row with role=admin
-  const { error: insErr } = await admin.from('users').insert({
-    id: created.user.id,
-    email,
-    full_name: fullName,
-    role: 'admin',
-    is_active: true,
-  });
-  if (insErr) {
+  // Wait for the on_auth_user_created trigger to insert the public.users row
+  await new Promise((r) => setTimeout(r, 500));
+
+  // Enrich the trigger-created row: set role=admin, full_name, email
+  const { error: updErr } = await admin
+    .from('users')
+    .update({
+      full_name: fullName,
+      role: 'admin',
+      is_active: true,
+      email,
+    })
+    .eq('id', created.user.id);
+  if (updErr) {
     // Roll back the auth user to avoid orphan
-    await admin.auth.admin.deleteUser(created.user.id);
-    return { ok: false, error: `Ошибка профиля: ${insErr.message}` };
+    const { error: delErr } = await admin.auth.admin.deleteUser(created.user.id);
+    if (delErr) {
+      console.error('signUpAdmin: rollback failed', { userId: created.user.id, delErr });
+    }
+    return { ok: false, error: `Ошибка профиля: ${updErr.message}` };
   }
 
   return { ok: true };
