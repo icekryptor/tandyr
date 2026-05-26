@@ -124,6 +124,46 @@ export async function updateEmployeeCities(userId: string, cityIds: string[]) {
   return { success: true };
 }
 
+export async function createInvite(input: {
+  email?: string;
+  store_id?: string;
+  company_role?: string;
+}): Promise<{ token: string } | { error: string }> {
+  // Use service role; the gate is implicit because this action is callable
+  // only from /employees pages which are inside (dashboard) and auth-gated.
+  // Re-check the user is a system admin or business admin for defence-in-depth.
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: 'Не авторизованы' };
+
+  const admin = createAdminClient();
+
+  const { data: me } = await admin
+    .from('users')
+    .select('role, company_role')
+    .eq('id', user.id)
+    .single();
+  const isSystemAdmin = me?.role === 'admin';
+  const isBusinessAdmin = ['owner', 'admin'].includes(me?.company_role ?? '');
+  if (!me || (!isSystemAdmin && !isBusinessAdmin)) {
+    return { error: 'Недостаточно прав' };
+  }
+
+  const payload: Record<string, unknown> = { created_by: user.id };
+  if (input.email?.trim()) payload.email = input.email.trim();
+  if (input.store_id) payload.store_id = input.store_id;
+  if (input.company_role) payload.company_role = input.company_role;
+
+  const { data, error } = await admin
+    .from('invites')
+    .insert(payload)
+    .select('token')
+    .single();
+
+  if (error || !data) return { error: error?.message ?? 'Не удалось создать инвайт.' };
+  return { token: data.token };
+}
+
 export async function uploadEmployeeFile(id: string, formData: FormData) {
   const admin = createAdminClient();
   const file = formData.get('file') as File;
