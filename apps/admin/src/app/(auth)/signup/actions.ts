@@ -2,6 +2,8 @@
 
 import { createClient as createAdminClient } from '@supabase/supabase-js';
 
+import { updateUserProfileWithTriggerRetry } from '@/lib/supabase/profile-update';
+
 type Result = { ok: true } | { ok: false; error: string };
 
 export async function signUpAdmin(formData: FormData): Promise<Result> {
@@ -47,26 +49,23 @@ export async function signUpAdmin(formData: FormData): Promise<Result> {
     return { ok: false, error: raw || 'Не удалось создать аккаунт.' };
   }
 
-  // Wait for the on_auth_user_created trigger to insert the public.users row
-  await new Promise((r) => setTimeout(r, 500));
-
-  // Enrich the trigger-created row: set role=admin, full_name, email
-  const { error: updErr } = await admin
-    .from('users')
-    .update({
-      full_name: fullName,
-      role: 'admin',
-      is_active: true,
-      email,
-    })
-    .eq('id', created.user.id);
-  if (updErr) {
+  // Enrich the trigger-created row: set role=admin, full_name, email.
+  // The on_auth_user_created trigger inserts the row asynchronously, so we
+  // retry with backoff until the row exists (otherwise UPDATE matches 0 rows
+  // and silently succeeds, leaving an orphan profile).
+  const profile = await updateUserProfileWithTriggerRetry(admin, created.user.id, {
+    full_name: fullName,
+    role: 'admin',
+    is_active: true,
+    email,
+  });
+  if (!profile.ok) {
     // Roll back the auth user to avoid orphan
     const { error: delErr } = await admin.auth.admin.deleteUser(created.user.id);
     if (delErr) {
       console.error('signUpAdmin: rollback failed', { userId: created.user.id, delErr });
     }
-    return { ok: false, error: `Ошибка профиля: ${updErr.message}` };
+    return { ok: false, error: `Ошибка профиля: ${profile.error}` };
   }
 
   return { ok: true };

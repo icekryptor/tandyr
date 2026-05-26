@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { updateUserProfileWithTriggerRetry } from '@/lib/supabase/profile-update';
 import { revalidatePath } from 'next/cache';
 import { nullifyEmpty, safeFloat } from '@tandyr/shared';
 
@@ -24,20 +25,17 @@ export async function createEmployee(formData: FormData) {
 
   if (authError) return { error: authError.message };
 
-  // Wait for the DB trigger to insert the user profile row
-  await new Promise((r) => setTimeout(r, 500));
+  // The on_auth_user_created trigger inserts the public.users row
+  // asynchronously, so retry with backoff until the row exists (otherwise
+  // UPDATE matches 0 rows and silently succeeds, leaving an orphan profile).
+  const profile = await updateUserProfileWithTriggerRetry(admin, authData.user.id, {
+    full_name,
+    phone: nullifyEmpty(phone),
+    store_id: nullifyEmpty(store_id),
+    company_role: nullifyEmpty(company_role),
+  });
 
-  const { error: profileError } = await admin
-    .from('users')
-    .update({
-      full_name,
-      phone: nullifyEmpty(phone),
-      store_id: nullifyEmpty(store_id),
-      company_role: nullifyEmpty(company_role),
-    })
-    .eq('id', authData.user.id);
-
-  if (profileError) return { error: profileError.message };
+  if (!profile.ok) return { error: profile.error };
 
   revalidatePath('/employees');
   return { success: true };

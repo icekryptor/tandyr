@@ -2,6 +2,8 @@
 
 import { createClient as createAdminClient } from '@supabase/supabase-js';
 
+import { updateUserProfileWithTriggerRetry } from '@/lib/supabase/profile-update';
+
 type AcceptResult = { ok: true } | { ok: false; error: string };
 
 export async function acceptInvite(formData: FormData): Promise<AcceptResult> {
@@ -56,34 +58,47 @@ export async function acceptInvite(formData: FormData): Promise<AcceptResult> {
     return { ok: false, error: raw || 'Не удалось создать аккаунт.' };
   }
 
-  // Wait for on_auth_user_created trigger to insert the public.users row, then UPDATE
-  await new Promise((r) => setTimeout(r, 500));
+  // The on_auth_user_created trigger inserts the public.users row
+  // asynchronously, so retry with backoff until the row exists (otherwise
+  // UPDATE matches 0 rows and silently succeeds, leaving an orphan profile).
+  const profile = await updateUserProfileWithTriggerRetry(admin, created.user.id, {
+    full_name: fullName,
+    role: 'employee',
+    company_role: finalRole,
+    store_id: finalStore,
+    is_active: true,
+    email: finalEmail,
+  });
 
-  const { error: updErr } = await admin
-    .from('users')
-    .update({
-      full_name: fullName,
-      role: 'employee',
-      company_role: finalRole,
-      store_id: finalStore,
-      is_active: true,
-      email: finalEmail,
-    })
-    .eq('id', created.user.id);
-
-  if (updErr) {
+  if (!profile.ok) {
     const { error: delErr } = await admin.auth.admin.deleteUser(created.user.id);
     if (delErr) {
       console.error('acceptInvite: rollback failed', { userId: created.user.id, delErr });
     }
-    return { ok: false, error: `Ошибка профиля: ${updErr.message}` };
+    return { ok: false, error: `Ошибка профиля: ${profile.error}` };
   }
 
-  // Mark invite used
-  await admin
+  // Atomically claim the invite: only succeeds if used_at is still NULL.
+  // Two concurrent acceptors can both pass the earlier "used_at IS NULL"
+  // check; the loser of this race must roll back its auth user.
+  const { data: claimed, error: claimErr } = await admin
     .from('invites')
     .update({ used_at: new Date().toISOString(), used_by_user_id: created.user.id })
-    .eq('id', invite.id);
+    .eq('id', invite.id)
+    .is('used_at', null)
+    .select('id');
+
+  if (claimErr) {
+    console.error('acceptInvite: mark-used UPDATE errored', { inviteId: invite.id, claimErr });
+  }
+  if (!claimed || claimed.length === 0) {
+    // Lost the race — another acceptor won. Roll back our auth user.
+    const { error: delErr } = await admin.auth.admin.deleteUser(created.user.id);
+    if (delErr) {
+      console.error('acceptInvite: rollback after losing race failed', { userId: created.user.id, delErr });
+    }
+    return { ok: false, error: 'Этой ссылкой уже воспользовались.' };
+  }
 
   return { ok: true };
 }
