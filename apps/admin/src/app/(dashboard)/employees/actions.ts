@@ -35,7 +35,14 @@ export async function createEmployee(formData: FormData) {
     company_role: nullifyEmpty(company_role),
   });
 
-  if (!profile.ok) return { error: profile.error };
+  if (!profile.ok) {
+    // Roll back the auth user to avoid orphans — mirrors signUpAdmin / acceptInvite.
+    const { error: delErr } = await admin.auth.admin.deleteUser(authData.user.id);
+    if (delErr) {
+      console.error('createEmployee: rollback failed', { userId: authData.user.id, delErr });
+    }
+    return { error: profile.error };
+  }
 
   revalidatePath('/employees');
   return { success: true };
