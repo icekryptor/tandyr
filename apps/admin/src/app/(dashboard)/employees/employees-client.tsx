@@ -12,9 +12,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
 } from '@/components/ui/dialog';
-import { UserPlus, Search, ShieldBan, ShieldCheck } from 'lucide-react';
+import { UserPlus, Search, ShieldBan, ShieldCheck, Link2 } from 'lucide-react';
 import Link from 'next/link';
-import { createEmployee, toggleEmployeeStatus } from './actions';
+import { createEmployee, createInvite, toggleEmployeeStatus } from './actions';
 import { COMPANY_ROLE_LABELS, COMPANY_ROLE_COLORS, pluralize } from '@tandyr/shared';
 import type { User, Store } from '@tandyr/shared';
 
@@ -38,6 +38,18 @@ export function EmployeesClient({ employees, stores }: Props) {
   const [isToggling, startToggleTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [toggleError, setToggleError] = useState<string | null>(null);
+
+  // Invite modal state
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [inviteForm, setInviteForm] = useState<{ email: string; store_id: string; company_role: string }>({
+    email: '',
+    store_id: '',
+    company_role: '',
+  });
+  const [inviteLink, setInviteLink] = useState<string | null>(null);
+  const [invitePending, setInvitePending] = useState(false);
+  const [inviteError, setInviteError] = useState<string | null>(null);
+  const [inviteCopied, setInviteCopied] = useState(false);
 
   const filtered = employees.filter((e) =>
     e.full_name.toLowerCase().includes(search.toLowerCase()) ||
@@ -70,6 +82,45 @@ export function EmployeesClient({ employees, stores }: Props) {
     if (open) setError(null);
   };
 
+  const handleInviteDialogChange = (open: boolean) => {
+    setInviteOpen(open);
+    if (!open) {
+      setInviteForm({ email: '', store_id: '', company_role: '' });
+      setInviteLink(null);
+      setInviteError(null);
+      setInvitePending(false);
+      setInviteCopied(false);
+    }
+  };
+
+  const handleCreateInvite = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setInviteError(null);
+    setInvitePending(true);
+    const result = await createInvite({
+      email: inviteForm.email || undefined,
+      store_id: inviteForm.store_id && inviteForm.store_id !== '__none__' ? inviteForm.store_id : undefined,
+      company_role: inviteForm.company_role && inviteForm.company_role !== '__none__' ? inviteForm.company_role : undefined,
+    });
+    setInvitePending(false);
+    if ('error' in result) {
+      setInviteError(result.error);
+    } else {
+      setInviteLink(`${window.location.origin}/invite/${result.token}`);
+    }
+  };
+
+  const handleCopyInvite = async () => {
+    if (!inviteLink) return;
+    try {
+      await navigator.clipboard.writeText(inviteLink);
+      setInviteCopied(true);
+      setTimeout(() => setInviteCopied(false), 1500);
+    } catch {
+      // ignore — user can copy manually
+    }
+  };
+
   return (
     <div className="p-6 max-w-7xl mx-auto">
       <div className="flex items-center justify-between mb-6">
@@ -77,31 +128,135 @@ export function EmployeesClient({ employees, stores }: Props) {
           <h1 className="text-2xl font-bold">Сотрудники</h1>
           <p className="text-muted-foreground text-sm mt-1">{employees.length} {pluralize(employees.length, 'сотрудник', 'сотрудника', 'сотрудников')}</p>
         </div>
-        <Dialog open={createOpen} onOpenChange={handleDialogChange}>
-          <DialogTrigger asChild>
-            <Button>
-              <UserPlus className="h-4 w-4 mr-2" />
-              Добавить
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Новый сотрудник</DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleCreate} className="space-y-4 mt-2">
-              <FormField label="ФИО" name="full_name" required />
-              <FormField label="Email" name="email" type="email" required />
-              <FormField label="Пароль" name="password" type="password" required />
-              <FormField label="Телефон" name="phone" />
-              <CompanyRoleSelect />
-              <StoreSelect stores={stores} />
-              {error && <p className="text-destructive text-sm">{error}</p>}
-              <Button type="submit" className="w-full" disabled={isCreating}>
-                {isCreating ? 'Создание...' : 'Создать'}
+        <div className="flex items-center gap-2">
+          <Dialog open={inviteOpen} onOpenChange={handleInviteDialogChange}>
+            <DialogTrigger asChild>
+              <Button variant="outline">
+                <Link2 className="h-4 w-4 mr-2" />
+                Пригласить
               </Button>
-            </form>
-          </DialogContent>
-        </Dialog>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Пригласить сотрудника</DialogTitle>
+              </DialogHeader>
+              {!inviteLink ? (
+                <form onSubmit={handleCreateInvite} className="space-y-4 mt-2">
+                  <p className="text-sm text-muted-foreground">
+                    Все поля опциональны. Если оставить пустыми — сотрудник заполнит их при регистрации.
+                  </p>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="invite_email">Email</Label>
+                    <Input
+                      id="invite_email"
+                      name="invite_email"
+                      type="email"
+                      value={inviteForm.email}
+                      onChange={(e) => setInviteForm((s) => ({ ...s, email: e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="invite_store_id">Магазин</Label>
+                    <Select
+                      value={inviteForm.store_id}
+                      onValueChange={(value) => setInviteForm((s) => ({ ...s, store_id: value }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Выберите магазин" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">— Не указано —</SelectItem>
+                        {stores.map((s) => (
+                          <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="invite_role">Роль в компании</Label>
+                    <Select
+                      value={inviteForm.company_role}
+                      onValueChange={(value) => setInviteForm((s) => ({ ...s, company_role: value }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Выберите роль" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">— Не указано —</SelectItem>
+                        {COMPANY_ROLES.map((r) => (
+                          <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {inviteError && (
+                    <p className="text-destructive text-sm">{inviteError}</p>
+                  )}
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => handleInviteDialogChange(false)}
+                      disabled={invitePending}
+                    >
+                      Отмена
+                    </Button>
+                    <Button type="submit" className="flex-1" disabled={invitePending}>
+                      {invitePending ? 'Создание...' : 'Создать ссылку'}
+                    </Button>
+                  </div>
+                </form>
+              ) : (
+                <div className="space-y-3 mt-2">
+                  <p className="text-sm">Ссылка для отправки сотруднику:</p>
+                  <div className="flex gap-2">
+                    <input
+                      readOnly
+                      value={inviteLink}
+                      onFocus={(e) => e.currentTarget.select()}
+                      className="flex-1 px-3 py-2 rounded-xl border border-border bg-background text-xs font-mono"
+                    />
+                    <Button onClick={handleCopyInvite}>
+                      {inviteCopied ? 'Скопировано' : 'Скопировать'}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">Ссылка действительна 7 дней.</p>
+                  <div className="flex justify-end">
+                    <Button variant="outline" onClick={() => handleInviteDialogChange(false)}>
+                      Готово
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </DialogContent>
+          </Dialog>
+          <Dialog open={createOpen} onOpenChange={handleDialogChange}>
+            <DialogTrigger asChild>
+              <Button>
+                <UserPlus className="h-4 w-4 mr-2" />
+                Добавить
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Новый сотрудник</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleCreate} className="space-y-4 mt-2">
+                <FormField label="ФИО" name="full_name" required />
+                <FormField label="Email" name="email" type="email" required />
+                <FormField label="Пароль" name="password" type="password" required />
+                <FormField label="Телефон" name="phone" />
+                <CompanyRoleSelect />
+                <StoreSelect stores={stores} />
+                {error && <p className="text-destructive text-sm">{error}</p>}
+                <Button type="submit" className="w-full" disabled={isCreating}>
+                  {isCreating ? 'Создание...' : 'Создать'}
+                </Button>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       {toggleError && (
