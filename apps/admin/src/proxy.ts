@@ -25,7 +25,10 @@ export async function proxy(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser();
 
-  const isAuthRoute = request.nextUrl.pathname.startsWith('/login');
+  // Unauthenticated routes (login + recovery + open signup + invite acceptance).
+  // Authenticated users are bounced away from these to `/` below.
+  const PUBLIC_AUTH_PREFIXES = ['/login', '/forgot-password', '/reset-password', '/signup', '/invite/'];
+  const isAuthRoute = PUBLIC_AUTH_PREFIXES.some((p) => request.nextUrl.pathname.startsWith(p));
 
   // Allow API routes through without auth check
   if (request.nextUrl.pathname.startsWith('/api/')) {
