@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
@@ -11,7 +11,17 @@ import { Loader2 } from 'lucide-react';
 
 type Status = 'verifying' | 'ready' | 'invalid';
 
+const MIN_PASSWORD_LENGTH = 6;
+
 export default function ResetPasswordPage() {
+  return (
+    <Suspense fallback={null}>
+      <ResetPasswordPageInner />
+    </Suspense>
+  );
+}
+
+function ResetPasswordPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const code = searchParams.get('code');
@@ -21,8 +31,11 @@ export default function ResetPasswordPage() {
   const [confirm, setConfirm] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const consumedRef = useRef<string | null | undefined>(undefined);
 
   useEffect(() => {
+    if (consumedRef.current === code) return;
+    consumedRef.current = code;
     let cancelled = false;
     const exchange = async () => {
       if (!code) {
@@ -32,19 +45,24 @@ export default function ResetPasswordPage() {
       const supabase = createClient();
       const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
       if (cancelled) return;
-      setStatus(exchangeError ? 'invalid' : 'ready');
+      if (exchangeError) {
+        setStatus('invalid');
+        return;
+      }
+      setStatus('ready');
+      router.replace('/reset-password', { scroll: false });
     };
     void exchange();
     return () => {
       cancelled = true;
     };
-  }, [code]);
+  }, [code, router]);
 
   const onSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError(null);
 
-    if (password.length < 6) {
+    if (password.length < MIN_PASSWORD_LENGTH) {
       setError('Пароль должен быть не короче 6 символов');
       return;
     }
@@ -90,7 +108,7 @@ export default function ResetPasswordPage() {
 
           {status === 'invalid' && (
             <div className="space-y-4">
-              <div className="bg-destructive/10 border border-destructive/20 rounded-lg px-3 py-2">
+              <div role="alert" className="bg-destructive/10 border border-destructive/20 rounded-lg px-3 py-2">
                 <p className="text-destructive text-sm">Ссылка недействительна или устарела.</p>
               </div>
               <Link href="/forgot-password" className="block">
@@ -112,7 +130,7 @@ export default function ResetPasswordPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  minLength={6}
+                  minLength={MIN_PASSWORD_LENGTH}
                   autoComplete="new-password"
                 />
               </div>
@@ -126,13 +144,13 @@ export default function ResetPasswordPage() {
                   value={confirm}
                   onChange={(e) => setConfirm(e.target.value)}
                   required
-                  minLength={6}
+                  minLength={MIN_PASSWORD_LENGTH}
                   autoComplete="new-password"
                 />
               </div>
 
               {error && (
-                <div className="bg-destructive/10 border border-destructive/20 rounded-lg px-3 py-2">
+                <div role="alert" className="bg-destructive/10 border border-destructive/20 rounded-lg px-3 py-2">
                   <p className="text-destructive text-sm">{error}</p>
                 </div>
               )}

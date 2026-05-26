@@ -46,7 +46,7 @@ export default function ForgotPasswordPage() {
         <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
           {submitted ? (
             <div className="space-y-4">
-              <div className="bg-primary/10 border border-primary/20 rounded-lg px-3 py-2">
+              <div role="status" className="bg-primary/10 border border-primary/20 rounded-lg px-3 py-2">
                 <p className="text-foreground text-sm">{GENERIC_SUCCESS_MESSAGE}</p>
               </div>
               <p className="text-muted-foreground text-xs">
