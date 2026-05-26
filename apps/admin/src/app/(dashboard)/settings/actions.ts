@@ -8,10 +8,12 @@ export async function saveSettings(data: Record<string, string>) {
 
   const { data: me } = await supabase
     .from('users')
-    .select('company_role')
+    .select('role, company_role')
     .single();
 
-  if (!me || !['owner', 'admin'].includes(me.company_role ?? '')) {
+  const isSystemAdmin = me?.role === 'admin';
+  const isBusinessAdmin = ['owner', 'admin'].includes(me?.company_role ?? '');
+  if (!me || (!isSystemAdmin && !isBusinessAdmin)) {
     return { error: 'Недостаточно прав' };
   }
 

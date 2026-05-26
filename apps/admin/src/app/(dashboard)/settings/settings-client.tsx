@@ -58,6 +58,10 @@ export function SettingsClient({ settings: initial }: { settings: Record<string,
   const [values, setValues] = useState<Record<string, string>>(initial);
   const [isPending, startTransition] = useTransition();
   const [status, setStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [openSignupEnabled, setOpenSignupEnabled] = useState<boolean>(
+    initial.open_signup_enabled === 'true',
+  );
+  const [openSignupPending, startOpenSignupTransition] = useTransition();
 
   const handleChange = (key: string, val: string) => {
     setValues((prev) => ({ ...prev, [key]: val }));
@@ -72,6 +76,24 @@ export function SettingsClient({ settings: initial }: { settings: Record<string,
         setStatus({ type: 'error', message: result.error });
       } else {
         setStatus({ type: 'success', message: 'Настройки сохранены' });
+      }
+    });
+  };
+
+  const handleOpenSignupChange = (checked: boolean) => {
+    setStatus(null);
+    startOpenSignupTransition(async () => {
+      const result = await saveSettings({ open_signup_enabled: checked ? 'true' : 'false' });
+      if (result.error) {
+        setStatus({ type: 'error', message: result.error });
+      } else {
+        setOpenSignupEnabled(checked);
+        setStatus({
+          type: 'success',
+          message: checked
+            ? 'Открытая регистрация включена'
+            : 'Открытая регистрация выключена',
+        });
       }
     });
   };
@@ -150,6 +172,30 @@ export function SettingsClient({ settings: initial }: { settings: Record<string,
             'Сохранить'
           )}
         </Button>
+      </div>
+
+      {/* Section — Open admin signup toggle (security-sensitive) */}
+      <div className="bg-card border border-destructive/30 rounded-2xl p-5 space-y-3">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-semibold text-foreground">
+              Открытая регистрация админов
+            </h3>
+            <p className="text-xs text-muted-foreground mt-1 max-w-md">
+              Когда включено — на странице <code className="font-mono">/signup</code>{' '}
+              любой может зарегистрироваться как админ. Используйте только на время запуска.
+            </p>
+          </div>
+          <label className="inline-flex items-center cursor-pointer shrink-0">
+            <input
+              type="checkbox"
+              checked={openSignupEnabled}
+              onChange={(e) => handleOpenSignupChange(e.target.checked)}
+              disabled={openSignupPending}
+              className="w-5 h-5"
+            />
+          </label>
+        </div>
       </div>
     </div>
   );
