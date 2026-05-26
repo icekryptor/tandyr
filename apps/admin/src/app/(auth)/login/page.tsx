@@ -22,7 +22,9 @@ export default function LoginPage() {
 
 function LoginPageInner() {
   const router = useRouter();
-  const justReset = useSearchParams().get('reset') === '1';
+  const searchParams = useSearchParams();
+  const justReset = searchParams.get('reset') === '1';
+  const justSignedUp = searchParams.get('signup') === '1';
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -63,6 +65,11 @@ function LoginPageInner() {
           {justReset && (
             <div role="status" className="bg-green-50 border border-green-200 rounded-lg px-3 py-2 mb-3">
               <p className="text-green-700 text-sm">Пароль успешно обновлён. Войдите с новым паролем.</p>
+            </div>
+          )}
+          {justSignedUp && (
+            <div role="status" className="bg-green-50 border border-green-200 rounded-lg px-3 py-2 mb-3">
+              <p className="text-green-700 text-sm">Аккаунт создан. Войдите с указанным email и паролем.</p>
             </div>
           )}
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
