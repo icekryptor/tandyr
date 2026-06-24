@@ -1,6 +1,7 @@
 'use server';
 
 import { createClient as createAdminClient } from '@supabase/supabase-js';
+import { MIN_PASSWORD_LENGTH } from '@tandyr/shared';
 
 import { updateUserProfileWithTriggerRetry } from '@/lib/supabase/profile-update';
 
@@ -14,8 +15,8 @@ export async function signUpAdmin(formData: FormData): Promise<Result> {
   if (!email || !password || !fullName) {
     return { ok: false, error: 'Заполните все поля.' };
   }
-  if (password.length < 6) {
-    return { ok: false, error: 'Пароль должен быть не короче 6 символов.' };
+  if (password.length < MIN_PASSWORD_LENGTH) {
+    return { ok: false, error: `Пароль должен быть не короче ${MIN_PASSWORD_LENGTH} символов.` };
   }
 
   const admin = createAdminClient(

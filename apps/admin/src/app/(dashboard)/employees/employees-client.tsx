@@ -15,16 +15,8 @@ import {
 import { UserPlus, Search, ShieldBan, ShieldCheck, Link2 } from 'lucide-react';
 import Link from 'next/link';
 import { createEmployee, createInvite, toggleEmployeeStatus } from './actions';
-import { COMPANY_ROLE_LABELS, COMPANY_ROLE_COLORS, pluralize } from '@tandyr/shared';
+import { COMPANY_ROLE_LABELS, COMPANY_ROLES, COMPANY_ROLE_COLORS, pluralize } from '@tandyr/shared';
 import type { User, Store } from '@tandyr/shared';
-
-const COMPANY_ROLES = [
-  { value: 'baker', label: 'Пекарь' },
-  { value: 'manager', label: 'Управляющий' },
-  { value: 'tech_specialist', label: 'Тех. специалист' },
-  { value: 'admin', label: 'Администратор' },
-  { value: 'owner', label: 'Владелец' },
-];
 
 interface Props {
   employees: (User & { store: { name: string } | null })[];

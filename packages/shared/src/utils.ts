@@ -108,6 +108,18 @@ export const COMPANY_ROLE_LABELS: Record<string, string> = {
   owner: 'Владелец',
 };
 
+/** Ordered list form of COMPANY_ROLE_LABELS for dropdowns. */
+export const COMPANY_ROLES: ReadonlyArray<{ value: string; label: string }> = [
+  { value: 'baker', label: COMPANY_ROLE_LABELS.baker },
+  { value: 'manager', label: COMPANY_ROLE_LABELS.manager },
+  { value: 'tech_specialist', label: COMPANY_ROLE_LABELS.tech_specialist },
+  { value: 'admin', label: COMPANY_ROLE_LABELS.admin },
+  { value: 'owner', label: COMPANY_ROLE_LABELS.owner },
+];
+
+/** Minimum password length enforced across signup / invite / reset flows. */
+export const MIN_PASSWORD_LENGTH = 6;
+
 export const COMPANY_ROLE_COLORS: Record<string, string> = {
   baker: 'bg-amber-100 text-amber-800',
   manager: 'bg-blue-100 text-blue-800',

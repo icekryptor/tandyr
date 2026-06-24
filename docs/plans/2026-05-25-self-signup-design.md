@@ -132,3 +132,73 @@ Note: the `SELECT USING (true)` is intentional and minimal-info — the page onl
 3. Employee invites — 1 migration + 1 modal on `/employees` + invite-list panel (optional) + `/invite/[token]` route + server action. Medium.
 
 Each can ship in its own commit; the three are independent.
+
+---
+
+## Implementation notes (as shipped, retrospective)
+
+What actually shipped differs from the design in a few load-bearing ways. Listed here so future readers don't get confused.
+
+### Migration numbering
+
+| Design says | Actually shipped |
+|---|---|
+| `017_invites.sql` | `017_open_signup_setting.sql` |
+| (no mention of RLS fix) | `018_settings_rls_system_admin.sql` |
+| (no mention) | `019_invites.sql` |
+| (no mention) | `020_invites_rls_align.sql` |
+
+The two RLS migrations (018, 020) were discovered mid-implementation when smoke tests revealed RLS policies narrower than the application-level gates we'd just broadened.
+
+### Trigger collision — UPDATE, not INSERT
+
+The design's pseudocode for Feature 2 and Feature 3 has:
+
+```ts
+admin.from('users').insert({ id: created.user.id, ... })
+```
+
+In practice this fails: `public.users` already has an `on_auth_user_created` trigger (migration 001 lines 177-193) that auto-inserts a row when an `auth.users` row appears. Our INSERT then hit a duplicate-key violation, rolled back the auth user, and signup never succeeded.
+
+The shipped pattern is: `auth.admin.createUser` → wait for the trigger → `UPDATE public.users` to enrich the auto-created row with our role/store/profile. To handle the trigger's async timing reliably, the shared helper `apps/admin/src/lib/supabase/profile-update.ts` does progressive backoff `[150, 250, 400, 600, 850]ms` and fails loud if the row never appears. Used by `signUpAdmin`, `acceptInvite`, and `createEmployee`.
+
+### Atomic-claim on invite acceptance
+
+The design's `acceptInvite` does a non-atomic mark-used at the end:
+
+```ts
+await admin.from('invites').update({ used_at: ... }).eq('id', invite.id);
+```
+
+Two acceptors hitting the same valid token concurrently would both pass the initial `used_at IS NULL` check and both create separate auth users. The shipped version uses an atomic claim:
+
+```ts
+await admin.from('invites').update({ used_at, used_by_user_id })
+  .eq('id', invite.id).is('used_at', null).select('id');
+```
+
+If the result is empty, the second-comer lost the race and rolls back its own auth user.
+
+### Settings gate broadening
+
+The design assumes the existing settings gate (`company_role IN ('owner','admin')`) is sufficient. After this feature shipped a system admin (`role='admin'`, no `company_role`) couldn't reach the Settings page or save settings. The fix touches three layers:
+- Page-level check in `apps/admin/src/app/(dashboard)/settings/page.tsx` (commit `ff3498b`)
+- Server-action check in `apps/admin/src/app/(dashboard)/settings/actions.ts` (also re-fetches user via `.eq('id', user.id)` to dodge an RLS-multi-row trap)
+- RLS at the DB layer: migration 018 broadens `settings_write` to also accept `role='admin'`
+- Similarly migration 020 brings invites RLS in line with the `is_admin()` helper
+
+### Shared constants
+
+`MIN_PASSWORD_LENGTH = 6` and `COMPANY_ROLES` (ordered array form) live in `packages/shared/src/utils.ts` alongside the existing `COMPANY_ROLE_LABELS`. Consumed by `signUpAdmin`, `acceptInvite`, `/reset-password`, and the employees client.
+
+### Follow-up: `/signup` removal
+
+The temporary nature of Feature 2 needs an explicit removal step once the launch team is established. Tracked items:
+
+- Delete `apps/admin/src/app/(auth)/signup/` directory
+- Remove `'/signup'` from `PUBLIC_AUTH_PREFIXES` in `apps/admin/src/proxy.ts`
+- Remove the `?signup=1` banner from `apps/admin/src/app/(auth)/login/page.tsx`
+- Remove the toggle UI block from `apps/admin/src/app/(dashboard)/settings/settings-client.tsx`
+- Optionally `DELETE FROM settings WHERE key='open_signup_enabled'` (or just leave the orphan row — harmless)
+
+Forgot password and invites are persistent; only Feature 2 is temporary.

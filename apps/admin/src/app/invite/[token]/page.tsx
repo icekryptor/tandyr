@@ -1,16 +1,9 @@
 import { notFound } from 'next/navigation';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
+import { COMPANY_ROLE_LABELS } from '@tandyr/shared';
 import { InviteForm } from './invite-form';
 
 export const dynamic = 'force-dynamic';
-
-const COMPANY_ROLE_LABELS: Record<string, string> = {
-  baker: 'Пекарь',
-  manager: 'Управляющий',
-  tech_specialist: 'Тех. специалист',
-  admin: 'Администратор',
-  owner: 'Владелец',
-};
 
 function isExpired(expiresAt: string): boolean {
   return new Date(expiresAt).getTime() < Date.now();
@@ -39,7 +32,21 @@ export default async function InvitePage({
     return <InvalidPage reason="Срок действия ссылки истёк. Попросите менеджера прислать новую." />;
   }
 
-  const { data: stores } = await admin.from('stores').select('id, name').order('name');
+  // Avoid leaking the full store roster: if the invite already binds a
+  // store, fetch only that one for the readonly display. Otherwise fetch
+  // all for the dropdown.
+  let stores: { id: string; name: string }[] = [];
+  if (invite.store_id) {
+    const { data } = await admin
+      .from('stores')
+      .select('id, name')
+      .eq('id', invite.store_id)
+      .single();
+    if (data) stores = [data];
+  } else {
+    const { data } = await admin.from('stores').select('id, name').order('name');
+    stores = data ?? [];
+  }
 
   return (
     <InviteForm
@@ -47,7 +54,7 @@ export default async function InvitePage({
       preEmail={invite.email ?? ''}
       preStoreId={invite.store_id ?? ''}
       preRole={invite.company_role ?? ''}
-      stores={stores ?? []}
+      stores={stores}
       roleLabels={COMPANY_ROLE_LABELS}
     />
   );
