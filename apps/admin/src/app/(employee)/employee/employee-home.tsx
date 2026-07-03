@@ -1,284 +1,266 @@
 'use client';
 
-// NOTE: transitional version — start/end shift moved to dedicated pages
-// (/employee/start-shift, /employee/end-shift) with camera + geolocation.
-// This hub is fully rebuilt in Phase A4.
-
-import { useState, useTransition } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import {
-  Play,
-  Square,
-  BarChart3,
-  Wrench,
-  Clock,
-  MessageSquare,
-  CheckCircle2,
-  ChevronRight,
-  X,
-} from 'lucide-react';
-import { submitProgress, submitTechRequest } from './actions';
+import { useSyncExternalStore } from 'react';
+import { BarChart3, CheckCircle2, User, Wallet, Wrench } from 'lucide-react';
+import { formatDate, formatDateTime, formatKg } from '@tandyr/shared';
 
-type Screen = 'home' | 'progress' | 'tech-request';
-
-type EmployeeProfile = { full_name: string | null; email: string };
-type ShiftRow = {
+/* Supabase without generated DB types infers nested selects as arrays;
+   the server page pins these shapes via .returns<>(). */
+export type HubProfile = {
   id: string;
-  status: string;
-  created_at: string;
+  full_name: string | null;
+  avatar_url: string | null;
+  store_id: string | null;
+};
+
+export type HubOpenShift = {
+  id: string;
   start_time: string;
-  store_id: string;
+  store: { name: string; address: string | null } | null;
+};
+
+export type HubRecentShift = {
+  id: string;
+  start_time: string;
+  end_time: string | null;
   production_kg: number | null;
-  store: { name: string; address?: string | null } | null;
+  status: string;
+  store: { name: string } | null;
 };
 
 interface Props {
-  profile: EmployeeProfile | null;
-  openShift: ShiftRow | null;
-  recentShifts: ShiftRow[];
+  profile: HubProfile | null;
+  openShift: HubOpenShift | null;
+  recentShifts: HubRecentShift[];
+  started: boolean;
+  ended: boolean;
 }
 
-export function EmployeeHome({ profile, openShift, recentShifts }: Props) {
-  const router = useRouter();
-  const [isPending, startTransition] = useTransition();
-  const [screen, setScreen] = useState<Screen>('home');
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+// SSR-safe "is hydrated" flag: the greeting depends on the device clock,
+// which the server cannot know. Renders a neutral greeting on the server
+// and swaps to the time-of-day one after hydration.
+const emptySubscribe = () => () => {};
+function useIsHydrated(): boolean {
+  return useSyncExternalStore(
+    emptySubscribe,
+    () => true,
+    () => false,
+  );
+}
 
-  const [progressKg, setProgressKg] = useState('');
+function timeGreeting(): string {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Доброе утро';
+  if (hour < 17) return 'Добрый день';
+  return 'Добрый вечер';
+}
 
-  const reset = () => {
-    setError(null);
-    setSuccess(null);
-    setProgressKg('');
-  };
-
-  const goHome = () => {
-    reset();
-    setScreen('home');
-    router.refresh();
-  };
-
-  const handleProgress = () => {
-    if (!progressKg || !openShift) return setError('Укажите кг');
-    startTransition(async () => {
-      const result = await submitProgress(openShift.id, parseFloat(progressKg.replace(',', '.')));
-      if (result.error) return setError(result.error);
-      setSuccess('Прогресс отправлен!');
-      setTimeout(goHome, 1200);
-    });
-  };
-
-  const handleTechRequest = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const formData = new FormData(e.currentTarget);
-    const description = String(formData.get('description') ?? '');
-    startTransition(async () => {
-      const result = await submitTechRequest({ description });
-      if (result.error) return setError(result.error);
-      setSuccess('Заявка отправлена!');
-      setTimeout(goHome, 1200);
-    });
-  };
-
-  if (success) {
-    return (
-      <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
-        <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mb-4">
-          <CheckCircle2 className="h-8 w-8 text-green-600" />
-        </div>
-        <p className="text-lg font-semibold text-foreground">{success}</p>
-      </div>
-    );
-  }
-
-  if (screen === 'progress') {
-    return (
-      <div className="p-5">
-        <Header title="Промежуточный прогресс" onBack={goHome} />
-        <div className="space-y-4 mt-4">
-          <div className="space-y-1.5">
-            <Label>Сколько кг произведено?</Label>
-            <Input
-              type="text"
-              inputMode="decimal"
-              placeholder="0.0"
-              value={progressKg}
-              onChange={(e) => setProgressKg(e.target.value)}
-              className="text-2xl font-bold h-14 text-center"
-            />
-          </div>
-          {error && <p className="text-destructive text-sm">{error}</p>}
-          <Button onClick={handleProgress} className="w-full" disabled={isPending}>
-            {isPending ? 'Отправка...' : 'Отправить прогресс'}
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  if (screen === 'tech-request') {
-    return (
-      <div className="p-5">
-        <Header title="Техническая заявка" onBack={goHome} />
-        <form onSubmit={handleTechRequest} className="space-y-4 mt-4">
-          <div className="space-y-1.5">
-            <Label>Описание</Label>
-            <Textarea name="description" placeholder="Подробное описание..." rows={4} required />
-          </div>
-          {error && <p className="text-destructive text-sm">{error}</p>}
-          <Button type="submit" className="w-full" disabled={isPending}>
-            {isPending ? 'Отправка...' : 'Отправить заявку'}
-          </Button>
-        </form>
-      </div>
-    );
-  }
-
-  // Home screen
+function initialsOf(name: string | null): string {
   return (
-    <div className="p-5">
-      {/* Greeting */}
-      <div className="mb-6">
-        <p className="text-muted-foreground text-sm">Добро пожаловать,</p>
-        <h1 className="text-xl font-bold text-foreground">
-          {profile?.full_name ?? 'Сотрудник'}
-        </h1>
-      </div>
+    (name ?? '?')
+      .split(' ')
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0])
+      .join('')
+      .toUpperCase() || '?'
+  );
+}
 
-      {/* Shift status */}
-      {openShift ? (
-        <div className="rounded-2xl bg-green-50 border border-green-200 p-4 mb-6">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-            <span className="text-sm font-semibold text-green-700">Смена активна</span>
-          </div>
-          <p className="text-sm text-green-800 font-medium">{openShift.store?.name}</p>
-          <p className="text-xs text-green-600 mt-0.5">{openShift.store?.address}</p>
-          <div className="flex items-center gap-1 mt-2 text-xs text-green-600">
-            <Clock className="h-3 w-3" />
-            <span>
-              С {new Date(openShift.start_time).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
-            </span>
-          </div>
-        </div>
-      ) : (
-        <div className="rounded-2xl bg-muted/50 border border-border p-4 mb-6 text-center">
-          <p className="text-sm text-muted-foreground">Нет активной смены</p>
-        </div>
-      )}
+export function EmployeeHome({ profile, openShift, recentShifts, started, ended }: Props) {
+  const hydrated = useIsHydrated();
+  const greet = hydrated ? timeGreeting() : 'Здравствуйте';
+  const firstName = profile?.full_name?.split(' ')[0] || 'Сотрудник';
 
-      {/* Action buttons */}
-      <div className="grid grid-cols-2 gap-3 mb-6">
-        {!openShift ? (
+  return (
+    <div className="min-h-screen bg-background pb-10">
+      {/* Header */}
+      <header className="bg-primary px-6 pt-6 pb-6 rounded-b-3xl">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-primary-foreground/80 text-sm">{greet},</p>
+            <p className="text-primary-foreground text-xl font-bold">{firstName}</p>
+          </div>
           <Link
-            href="/employee/start-shift"
-            className="col-span-2 flex items-center gap-3 p-4 rounded-2xl bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+            href="/employee/profile"
+            aria-label="Профиль"
+            className="w-11 h-11 rounded-full bg-white/20 flex items-center justify-center overflow-hidden shrink-0"
           >
-            <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
-              <Play className="h-5 w-5" />
-            </div>
-            <div className="text-left">
-              <p className="font-semibold text-sm">Начать смену</p>
-              <p className="text-xs opacity-80">Фото + геолокация</p>
-            </div>
+            {profile?.avatar_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={profile.avatar_url} alt="" className="w-full h-full object-cover" />
+            ) : (
+              <span className="text-primary-foreground font-bold text-sm">
+                {initialsOf(profile?.full_name ?? null)}
+              </span>
+            )}
           </Link>
-        ) : (
-          <>
+        </div>
+      </header>
+
+      <div className="px-6 pt-6 space-y-4">
+        {/* Success banners */}
+        {started && <SuccessBanner text="Смена открыта! Хорошей работы." />}
+        {ended && <SuccessBanner text="Смена завершена! Отличная работа." />}
+
+        {/* Active shift / start CTA */}
+        {openShift ? (
+          <div className="bg-card border border-border rounded-2xl p-5 shadow-sm">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="w-2.5 h-2.5 rounded-full bg-green-500" aria-hidden />
+              <span className="text-sm font-semibold text-green-700">Смена открыта</span>
+            </div>
+            <p className="text-lg font-bold text-foreground">{openShift.store?.name ?? 'Магазин'}</p>
+            {openShift.store?.address && (
+              <p className="text-sm text-muted-foreground mt-1">{openShift.store.address}</p>
+            )}
+            <p className="text-xs text-muted-foreground mt-2">
+              Начало: {formatDateTime(openShift.start_time)}
+            </p>
             <Link
               href="/employee/end-shift"
-              className="flex items-center gap-3 p-4 rounded-2xl bg-destructive/10 border border-destructive/20 text-destructive hover:bg-destructive/20 transition-colors"
+              className="mt-4 flex h-12 items-center justify-center rounded-xl bg-primary text-primary-foreground font-semibold hover:bg-primary/90 transition-colors"
             >
-              <Square className="h-5 w-5" />
-              <div className="text-left">
-                <p className="font-semibold text-xs">Завершить</p>
-              </div>
+              Завершить смену
             </Link>
-            <button
-              onClick={() => { reset(); setScreen('progress'); }}
-              className="flex items-center gap-3 p-4 rounded-2xl bg-accent/10 border border-accent/20 text-accent hover:bg-accent/20 transition-colors"
+          </div>
+        ) : (
+          <div className="bg-card border border-border rounded-2xl p-5 shadow-sm">
+            <p className="text-lg font-bold text-foreground mb-1">Нет активной смены</p>
+            <p className="text-sm text-muted-foreground mb-4">
+              Сфотографируйте рабочее место для начала смены
+            </p>
+            <Link
+              href="/employee/start-shift"
+              className="flex h-12 items-center justify-center rounded-xl bg-primary text-primary-foreground font-semibold hover:bg-primary/90 transition-colors"
             >
-              <BarChart3 className="h-5 w-5" />
-              <div className="text-left">
-                <p className="font-semibold text-xs">Прогресс</p>
-              </div>
-            </button>
-          </>
+              Начать смену
+            </Link>
+          </div>
         )}
-        <button
-          onClick={() => { reset(); setScreen('tech-request'); }}
-          className="col-span-2 flex items-center justify-between p-4 rounded-2xl border border-border hover:bg-muted/50 transition-colors"
-        >
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-orange-50 flex items-center justify-center">
-              <Wrench className="h-5 w-5 text-orange-500" />
-            </div>
-            <div className="text-left">
-              <p className="font-semibold text-sm text-foreground">Техзаявка</p>
-              <p className="text-xs text-muted-foreground">Сообщить о поломке</p>
-            </div>
-          </div>
-          <ChevronRight className="h-4 w-4 text-muted-foreground" />
-        </button>
-        <Link
-          href="/chats"
-          className="col-span-2 flex items-center justify-between p-4 rounded-2xl border border-border hover:bg-muted/50 transition-colors"
-        >
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center">
-              <MessageSquare className="h-5 w-5 text-blue-500" />
-            </div>
-            <div className="text-left">
-              <p className="font-semibold text-sm text-foreground">Чаты</p>
-              <p className="text-xs text-muted-foreground">Связь с руководством</p>
-            </div>
-          </div>
-          <ChevronRight className="h-4 w-4 text-muted-foreground" />
-        </Link>
-      </div>
 
-      {/* Recent shifts */}
-      {recentShifts.length > 0 && (
-        <div>
-          <h2 className="text-sm font-semibold text-foreground mb-3">Последние смены</h2>
-          <div className="space-y-2">
-            {recentShifts.map((shift) => (
-              <div key={shift.id} className="flex items-center justify-between p-3 rounded-xl bg-card border border-border">
-                <div className="flex items-center gap-2.5">
-                  <div className={`w-2 h-2 rounded-full ${shift.status === 'open' ? 'bg-green-500' : 'bg-muted-foreground/40'}`} />
-                  <div>
-                    <p className="text-sm font-medium">{shift.store?.name ?? '—'}</p>
-                    <p className="text-[11px] text-muted-foreground">
-                      {new Date(shift.created_at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}
+        {/* Actions grid */}
+        <h2 className="text-base font-bold text-foreground pt-2">Действия</h2>
+        <div className="grid grid-cols-2 gap-3">
+          <ActionTile
+            href="/employee/progress"
+            disabled={!openShift}
+            icon={<BarChart3 className="h-6 w-6 text-green-600" />}
+            iconBg="bg-green-500/10"
+            label="Прогресс"
+            sub={openShift ? 'Промежуточные кг' : 'Нужна открытая смена'}
+          />
+          <ActionTile
+            href="/employee/tech-request"
+            icon={<Wrench className="h-6 w-6 text-primary" />}
+            iconBg="bg-primary/10"
+            label="Техзаявка"
+            sub="Сообщить о поломке"
+          />
+          <ActionTile
+            href="/employee/salary"
+            icon={<Wallet className="h-6 w-6 text-amber-600" />}
+            iconBg="bg-amber-500/10"
+            label="Зарплата"
+            sub="Заработок по неделям"
+          />
+          <ActionTile
+            href="/employee/profile"
+            icon={<User className="h-6 w-6 text-blue-600" />}
+            iconBg="bg-blue-500/10"
+            label="Профиль"
+            sub="Телефон и фото"
+          />
+        </div>
+
+        {/* Recent shifts */}
+        {recentShifts.length > 0 && (
+          <div className="pt-2">
+            <h2 className="text-base font-bold text-foreground mb-3">Последние смены</h2>
+            <div className="space-y-2">
+              {recentShifts.map((shift) => (
+                <div
+                  key={shift.id}
+                  className="flex items-center justify-between bg-card border border-border rounded-xl px-4 py-3"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate">
+                      {shift.store?.name ?? '—'}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {formatDate(shift.start_time)}
                     </p>
                   </div>
+                  {shift.production_kg !== null && (
+                    <span className="text-sm font-semibold text-foreground shrink-0 ml-3">
+                      {formatKg(shift.production_kg)}
+                    </span>
+                  )}
                 </div>
-                {shift.production_kg && (
-                  <span className="text-xs font-medium text-muted-foreground">
-                    {shift.production_kg} кг
-                  </span>
-                )}
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
 
-function Header({ title, onBack }: { title: string; onBack: () => void }) {
+function SuccessBanner({ text }: { text: string }) {
   return (
-    <div className="flex items-center gap-3">
-      <button onClick={onBack} className="w-8 h-8 rounded-full bg-muted flex items-center justify-center hover:bg-muted/80 transition-colors">
-        <X className="h-4 w-4" />
-      </button>
-      <h1 className="text-lg font-bold text-foreground">{title}</h1>
+    <div
+      role="status"
+      className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-2xl px-4 py-3"
+    >
+      <CheckCircle2 className="h-5 w-5 text-green-600 shrink-0" />
+      <p className="text-green-700 text-sm font-medium">{text}</p>
     </div>
+  );
+}
+
+function ActionTile({
+  href,
+  icon,
+  iconBg,
+  label,
+  sub,
+  disabled,
+}: {
+  href: string;
+  icon: React.ReactNode;
+  iconBg: string;
+  label: string;
+  sub: string;
+  disabled?: boolean;
+}) {
+  const content = (
+    <>
+      <span className={`w-12 h-12 rounded-2xl ${iconBg} flex items-center justify-center`}>
+        {icon}
+      </span>
+      <span className="text-sm font-semibold text-foreground">{label}</span>
+      <span className="text-[11px] text-muted-foreground text-center leading-tight">{sub}</span>
+    </>
+  );
+
+  if (disabled) {
+    return (
+      <div
+        aria-disabled="true"
+        className="flex flex-col items-center gap-2 bg-card border border-border rounded-2xl p-4 opacity-50 select-none"
+      >
+        {content}
+      </div>
+    );
+  }
+
+  return (
+    <Link
+      href={href}
+      className="flex flex-col items-center gap-2 bg-card border border-border rounded-2xl p-4 hover:border-primary/40 transition-colors"
+    >
+      {content}
+    </Link>
   );
 }
