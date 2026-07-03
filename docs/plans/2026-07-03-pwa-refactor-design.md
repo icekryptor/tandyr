@@ -105,3 +105,64 @@ Each phase ships independently; commits per task; two-stage review per phase (sp
 - Admin overview loads without regression in data completeness
 - PWA installable from Chrome Android (manifest + SW valid)
 - Expo app untouched and still builds
+
+---
+
+## Implementation notes (as shipped, retrospective)
+
+Phases A–C shipped 2026-07-03/04 across commits `fd19d0a..250a7de`. Notable
+deltas from the design:
+
+### Phase A (employee flow)
+- Additional schema bugs found during implementation beyond D1:
+  `progress_reports` has no `user_id` column and `tech_requests` has no
+  `title` column — the old web actions inserted both. All three employee
+  operations (start shift, progress, tech request) were broken on web.
+- The old `(employee)/layout.tsx` was a fixed-390px desktop "phone frame"
+  simulator; replaced with a real `max-w-md` responsive column.
+- Post-review hardening: try/catch around all server-action awaits (a
+  rejected action — network drop, redeploy — previously left the UI stuck
+  in pending forever), PhotoCapture disabled during submit, device-local
+  time rendering (shared `formatDateTime` is UTC-pinned), `ru-error.ts`
+  mapping raw Postgres/Storage messages to Russian.
+- Two new migrations written during review (files only until DB restore):
+  - `021_unique_open_shift.sql` — partial unique index closing the
+    check-then-insert race that could create two open shifts and brick
+    every `maybeSingle()` reader.
+  - `022_protect_privilege_columns.sql` — BEFORE UPDATE trigger blocking
+    self-service privilege escalation (the 001 "update own profile" RLS
+    policy had no column restrictions: any authenticated user could set
+    their own `role='admin'` via the anon key). Pre-existing hole found
+    during Phase A review.
+
+### Phase B (PWA)
+- Serwist rejected: `withSerwist` injects its precache manifest via a
+  webpack plugin that Turbopack (our production builder) never executes;
+  the Turbopack-specific package needs esbuild deps + route-handler SW.
+  Hand-rolled `public/sw.js` per the plan's fallback rule.
+- `proxy.ts` needed a no-auth passthrough for `/manifest.webmanifest`,
+  `/sw.js`, `/offline` — manifest fetches are credential-less and a 307
+  to /login breaks installability outright.
+- Post-review: `/employee` removed from SW precache (cache.addAll sends
+  cookies → snapshotted one user's authenticated HTML into Cache Storage);
+  offline page styled exclusively inline (its cached HTML outlives the CSS
+  chunk hashes it was built with).
+
+### Phase C (admin speed)
+- Biggest win was not in the plan: `packages/shared` lacked
+  `"sideEffects": false`, so its barrel re-export of zod schemas shipped a
+  ~62 kB zod chunk to nearly every route (only /login needs it). One-line
+  package.json fix; verified Expo unaffected (mobile uses its local copy).
+- Slimming the employees list select also stopped shipping card numbers,
+  PINs and passport data to every admin's browser — a real PII exposure,
+  not just perf.
+- force-dynamic audit: 16 sites (plan said 17), 7 removed (cookie-reading
+  pages are auto-dynamic), 9 kept with explanatory comments (service-role
+  pages WOULD go permanently static without the flag).
+
+### Phase D (verification) — partially blocked at time of writing
+- Deploy + PWA endpoint smoke: done (manifest/sw/offline all 200 on prod).
+- Knowledge graph updated: 727 nodes / 931 edges after the refactor.
+- Full mobile-viewport E2E + migrations 021/022: blocked on Supabase
+  restore (org hit the free-plan 2-active-project limit after billing
+  lapse; awaiting user decision to pause a sibling project or upgrade).
