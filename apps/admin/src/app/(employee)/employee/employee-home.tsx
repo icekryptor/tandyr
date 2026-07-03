@@ -1,5 +1,9 @@
 'use client';
 
+// NOTE: transitional version — start/end shift moved to dedicated pages
+// (/employee/start-shift, /employee/end-shift) with camera + geolocation.
+// This hub is fully rebuilt in Phase A4.
+
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -18,45 +22,39 @@ import {
   ChevronRight,
   X,
 } from 'lucide-react';
-import { startShift, endShift, submitProgress, submitTechRequest } from './actions';
+import { submitProgress, submitTechRequest } from './actions';
 
-type Screen = 'home' | 'start-shift' | 'end-shift' | 'progress' | 'tech-request';
+type Screen = 'home' | 'progress' | 'tech-request';
 
 type EmployeeProfile = { full_name: string | null; email: string };
 type ShiftRow = {
   id: string;
   status: string;
   created_at: string;
-  started_at: string;
+  start_time: string;
   store_id: string;
   production_kg: number | null;
   store: { name: string; address?: string | null } | null;
 };
-type StoreOption = { id: string; name: string; address?: string | null };
 
 interface Props {
   profile: EmployeeProfile | null;
   openShift: ShiftRow | null;
-  stores: StoreOption[];
   recentShifts: ShiftRow[];
 }
 
-export function EmployeeHome({ profile, openShift, stores, recentShifts }: Props) {
+export function EmployeeHome({ profile, openShift, recentShifts }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [screen, setScreen] = useState<Screen>('home');
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  const [selectedStore, setSelectedStore] = useState('');
-  const [productionKg, setProductionKg] = useState('');
   const [progressKg, setProgressKg] = useState('');
 
   const reset = () => {
     setError(null);
     setSuccess(null);
-    setSelectedStore('');
-    setProductionKg('');
     setProgressKg('');
   };
 
@@ -66,30 +64,10 @@ export function EmployeeHome({ profile, openShift, stores, recentShifts }: Props
     router.refresh();
   };
 
-  const handleStartShift = () => {
-    if (!selectedStore) return setError('Выберите магазин');
-    startTransition(async () => {
-      const result = await startShift(selectedStore);
-      if (result.error) return setError(result.error);
-      setSuccess('Смена открыта!');
-      setTimeout(goHome, 1200);
-    });
-  };
-
-  const handleEndShift = () => {
-    if (!productionKg || !openShift) return setError('Укажите выработку');
-    startTransition(async () => {
-      const result = await endShift(openShift.id, parseFloat(productionKg));
-      if (result.error) return setError(result.error);
-      setSuccess('Смена закрыта!');
-      setTimeout(goHome, 1200);
-    });
-  };
-
   const handleProgress = () => {
     if (!progressKg || !openShift) return setError('Укажите кг');
     startTransition(async () => {
-      const result = await submitProgress(openShift.id, parseFloat(progressKg));
+      const result = await submitProgress(openShift.id, parseFloat(progressKg.replace(',', '.')));
       if (result.error) return setError(result.error);
       setSuccess('Прогресс отправлен!');
       setTimeout(goHome, 1200);
@@ -99,8 +77,9 @@ export function EmployeeHome({ profile, openShift, stores, recentShifts }: Props
   const handleTechRequest = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
+    const description = String(formData.get('description') ?? '');
     startTransition(async () => {
-      const result = await submitTechRequest(formData);
+      const result = await submitTechRequest({ description });
       if (result.error) return setError(result.error);
       setSuccess('Заявка отправлена!');
       setTimeout(goHome, 1200);
@@ -118,72 +97,6 @@ export function EmployeeHome({ profile, openShift, stores, recentShifts }: Props
     );
   }
 
-  if (screen === 'start-shift') {
-    return (
-      <div className="p-5">
-        <Header title="Начать смену" onBack={goHome} />
-        <div className="space-y-4 mt-4">
-          <div className="space-y-2">
-            <Label>Выберите магазин</Label>
-            <div className="space-y-2">
-              {stores.map((store) => (
-                <button
-                  key={store.id}
-                  type="button"
-                  onClick={() => setSelectedStore(store.id)}
-                  className={`w-full text-left p-3 rounded-xl border transition-colors ${
-                    selectedStore === store.id
-                      ? 'border-primary bg-primary/5'
-                      : 'border-border hover:border-primary/30'
-                  }`}
-                >
-                  <p className="font-medium text-sm">{store.name}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{store.address}</p>
-                </button>
-              ))}
-              {stores.length === 0 && (
-                <p className="text-sm text-muted-foreground text-center py-4">Нет магазинов</p>
-              )}
-            </div>
-          </div>
-          {error && <p className="text-destructive text-sm">{error}</p>}
-          <Button onClick={handleStartShift} className="w-full" disabled={isPending}>
-            {isPending ? 'Открытие...' : 'Открыть смену'}
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  if (screen === 'end-shift') {
-    return (
-      <div className="p-5">
-        <Header title="Завершить смену" onBack={goHome} />
-        <div className="space-y-4 mt-4">
-          <div className="rounded-xl bg-muted/50 border border-border p-4">
-            <p className="text-sm text-muted-foreground">Текущий магазин</p>
-            <p className="font-semibold">{openShift?.store?.name ?? '—'}</p>
-          </div>
-          <div className="space-y-1.5">
-            <Label>Итоговая выработка (кг)</Label>
-            <Input
-              type="number"
-              step="0.1"
-              placeholder="0.0"
-              value={productionKg}
-              onChange={(e) => setProductionKg(e.target.value)}
-              className="text-2xl font-bold h-14 text-center"
-            />
-          </div>
-          {error && <p className="text-destructive text-sm">{error}</p>}
-          <Button onClick={handleEndShift} className="w-full" variant="destructive" disabled={isPending}>
-            {isPending ? 'Закрытие...' : 'Закрыть смену'}
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
   if (screen === 'progress') {
     return (
       <div className="p-5">
@@ -192,8 +105,8 @@ export function EmployeeHome({ profile, openShift, stores, recentShifts }: Props
           <div className="space-y-1.5">
             <Label>Сколько кг произведено?</Label>
             <Input
-              type="number"
-              step="0.1"
+              type="text"
+              inputMode="decimal"
               placeholder="0.0"
               value={progressKg}
               onChange={(e) => setProgressKg(e.target.value)}
@@ -214,13 +127,6 @@ export function EmployeeHome({ profile, openShift, stores, recentShifts }: Props
       <div className="p-5">
         <Header title="Техническая заявка" onBack={goHome} />
         <form onSubmit={handleTechRequest} className="space-y-4 mt-4">
-          {openShift?.store_id && (
-            <input type="hidden" name="store_id" value={openShift.store_id} />
-          )}
-          <div className="space-y-1.5">
-            <Label>Заголовок</Label>
-            <Input name="title" placeholder="Кратко опишите проблему" required />
-          </div>
           <div className="space-y-1.5">
             <Label>Описание</Label>
             <Textarea name="description" placeholder="Подробное описание..." rows={4} required />
@@ -257,7 +163,7 @@ export function EmployeeHome({ profile, openShift, stores, recentShifts }: Props
           <div className="flex items-center gap-1 mt-2 text-xs text-green-600">
             <Clock className="h-3 w-3" />
             <span>
-              С {new Date(openShift.started_at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
+              С {new Date(openShift.start_time).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
             </span>
           </div>
         </div>
@@ -270,8 +176,8 @@ export function EmployeeHome({ profile, openShift, stores, recentShifts }: Props
       {/* Action buttons */}
       <div className="grid grid-cols-2 gap-3 mb-6">
         {!openShift ? (
-          <button
-            onClick={() => { reset(); setScreen('start-shift'); }}
+          <Link
+            href="/employee/start-shift"
             className="col-span-2 flex items-center gap-3 p-4 rounded-2xl bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
           >
             <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
@@ -279,20 +185,20 @@ export function EmployeeHome({ profile, openShift, stores, recentShifts }: Props
             </div>
             <div className="text-left">
               <p className="font-semibold text-sm">Начать смену</p>
-              <p className="text-xs opacity-80">Выбрать магазин</p>
+              <p className="text-xs opacity-80">Фото + геолокация</p>
             </div>
-          </button>
+          </Link>
         ) : (
           <>
-            <button
-              onClick={() => { reset(); setScreen('end-shift'); }}
+            <Link
+              href="/employee/end-shift"
               className="flex items-center gap-3 p-4 rounded-2xl bg-destructive/10 border border-destructive/20 text-destructive hover:bg-destructive/20 transition-colors"
             >
               <Square className="h-5 w-5" />
               <div className="text-left">
                 <p className="font-semibold text-xs">Завершить</p>
               </div>
-            </button>
+            </Link>
             <button
               onClick={() => { reset(); setScreen('progress'); }}
               className="flex items-center gap-3 p-4 rounded-2xl bg-accent/10 border border-accent/20 text-accent hover:bg-accent/20 transition-colors"

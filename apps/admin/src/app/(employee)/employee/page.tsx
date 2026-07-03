@@ -22,11 +22,6 @@ export default async function EmployeePage() {
     .eq('status', 'open')
     .maybeSingle();
 
-  const { data: stores } = await supabase
-    .from('stores')
-    .select('id, name, address')
-    .order('name');
-
   const { data: recentShifts } = await supabase
     .from('shifts')
     .select('*, store:stores(name)')
@@ -38,7 +33,6 @@ export default async function EmployeePage() {
     <EmployeeHome
       profile={profile}
       openShift={openShift}
-      stores={stores ?? []}
       recentShifts={recentShifts ?? []}
     />
   );
