@@ -1,3 +1,4 @@
+// service-role only — no cookie access, must stay dynamic
 export const dynamic = 'force-dynamic';
 
 import { createClient as createAdminClient } from '@supabase/supabase-js';
