@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Manrope } from 'next/font/google';
 import './globals.css';
 
@@ -12,6 +12,18 @@ const manrope = Manrope({
 export const metadata: Metadata = {
   title: 'Tandyr Admin',
   description: 'Система управления сменами пекарни Tandyr',
+  appleWebApp: {
+    capable: true,
+    title: 'Tandyr',
+    statusBarStyle: 'default',
+  },
+  icons: {
+    apple: '/apple-touch-icon.png',
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: '#E8564A',
 };
 
 export default function RootLayout({
