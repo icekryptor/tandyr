@@ -25,11 +25,16 @@ export function ProgressClient({ shiftId }: { shiftId: string }) {
     }
 
     setPending(true);
-    const result = await submitProgress(shiftId, value);
-    setPending(false);
-
-    if (result.error) setError(result.error);
-    else setDone(true);
+    try {
+      const result = await submitProgress(shiftId, value);
+      if (result.error) setError(result.error);
+      else setDone(true);
+    } catch {
+      // Server action rejected (network drop, stale action id after redeploy).
+      setError('Не удалось отправить. Проверьте соединение и попробуйте ещё раз.');
+    } finally {
+      setPending(false);
+    }
   };
 
   if (done) {

@@ -22,7 +22,14 @@ export async function compressImage(file: File, opts?: CompressOptions): Promise
       // `from-image` applies EXIF orientation so the canvas draw is upright.
       const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
       try {
-        if (file.size < SKIP_SIZE_BYTES && bitmap.width <= maxDim && bitmap.height <= maxDim) {
+        // Skip only for JPEG originals: callers upload with contentType
+        // image/jpeg, so HEIC/PNG/WebP must fall through and be re-encoded.
+        if (
+          file.type === 'image/jpeg' &&
+          file.size < SKIP_SIZE_BYTES &&
+          bitmap.width <= maxDim &&
+          bitmap.height <= maxDim
+        ) {
           return file;
         }
         return await drawToJpeg(bitmap, bitmap.width, bitmap.height, maxDim, quality);

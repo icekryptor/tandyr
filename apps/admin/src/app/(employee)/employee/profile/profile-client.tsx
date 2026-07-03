@@ -8,7 +8,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { createClient } from '@/lib/supabase/client';
 import { compressImage } from '@/lib/compress-image';
-import { uploadShiftPhoto } from '@/lib/upload-photo';
+import { initialsOf } from '@/lib/initials';
+import { uploadPhoto } from '@/lib/upload-photo';
 import { updateProfile } from '../actions';
 import { ScreenHeader } from '../screen-header';
 
@@ -21,18 +22,6 @@ export type ProfileRow = {
   avatar_url: string | null;
   store: { name: string; address: string | null } | null;
 };
-
-function initialsOf(name: string | null): string {
-  return (
-    (name ?? '?')
-      .split(' ')
-      .filter(Boolean)
-      .slice(0, 2)
-      .map((part) => part[0])
-      .join('')
-      .toUpperCase() || '?'
-  );
-}
 
 export function ProfileClient({ profile }: { profile: ProfileRow }) {
   const router = useRouter();
@@ -57,7 +46,7 @@ export function ProfileClient({ profile }: { profile: ProfileRow }) {
     setAvatarUploading(true);
     try {
       const blob = await compressImage(file, { maxDim: 512 });
-      const url = await uploadShiftPhoto('avatars', `avatars/${profile.id}/${Date.now()}.jpg`, blob);
+      const url = await uploadPhoto('avatars', `avatars/${profile.id}/${Date.now()}.jpg`, blob);
 
       const supabase = createClient();
       const { error: updateError } = await supabase
@@ -81,15 +70,20 @@ export function ProfileClient({ profile }: { profile: ProfileRow }) {
     setPhoneSaving(true);
 
     const trimmed = phone.trim();
-    const result = await updateProfile({ phone: trimmed.length === 0 ? null : trimmed });
-    setPhoneSaving(false);
-
-    if (result.error) {
-      setError(result.error);
-      return;
+    try {
+      const result = await updateProfile({ phone: trimmed.length === 0 ? null : trimmed });
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      setSavedPhone(trimmed);
+      setPhoneSaved(true);
+    } catch {
+      // Server action rejected (network drop, stale action id after redeploy).
+      setError('Не удалось отправить. Проверьте соединение и попробуйте ещё раз.');
+    } finally {
+      setPhoneSaving(false);
     }
-    setSavedPhone(trimmed);
-    setPhoneSaved(true);
   };
 
   const handleLogout = async () => {

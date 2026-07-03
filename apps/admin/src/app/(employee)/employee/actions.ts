@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
+import { ruError } from '@/lib/ru-error';
 
 export type ActionResult = { success: true; error?: never } | { success?: never; error: string };
 
@@ -42,7 +43,7 @@ export async function startShift({
     start_time: new Date().toISOString(),
     status: 'open',
   });
-  if (error) return { error: error.message };
+  if (error) return { error: ruError(error.message) };
 
   revalidatePath('/employee');
   return { success: true };
@@ -83,7 +84,7 @@ export async function endShift({
     .eq('user_id', user.id)
     .eq('status', 'open')
     .select('id');
-  if (error) return { error: error.message };
+  if (error) return { error: ruError(error.message) };
   if (!data || data.length === 0) return { error: 'Смена не найдена или уже закрыта' };
 
   revalidatePath('/employee');
@@ -114,7 +115,7 @@ export async function submitProgress(shiftId: string, kg: number): Promise<Actio
     production_kg: kg,
     reported_at: new Date().toISOString(),
   });
-  if (error) return { error: error.message };
+  if (error) return { error: ruError(error.message) };
   return { success: true };
 }
 
@@ -147,7 +148,7 @@ export async function submitTechRequest({
     description: trimmed,
     status: 'pending',
   });
-  if (error) return { error: error.message };
+  if (error) return { error: ruError(error.message) };
   return { success: true };
 }
 
@@ -161,7 +162,7 @@ export async function updateProfile({ phone }: { phone: string | null }): Promis
     .from('users')
     .update({ phone: trimmed.length === 0 ? null : trimmed })
     .eq('id', user.id);
-  if (error) return { error: error.message };
+  if (error) return { error: ruError(error.message) };
 
   revalidatePath('/employee/profile');
   revalidatePath('/employee');

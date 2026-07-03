@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { PhotoCapture } from '@/components/photo-capture';
 import { compressImage } from '@/lib/compress-image';
 import { getPosition } from '@/lib/geolocation';
-import { uploadShiftPhoto } from '@/lib/upload-photo';
+import { uploadPhoto } from '@/lib/upload-photo';
 import { startShift } from '../actions';
 import { ScreenHeader } from '../screen-header';
 
@@ -71,7 +71,7 @@ export function StartShiftClient({ userId, stores }: { userId: string; stores: S
       if (!store) throw new Error('Не удалось найти ближайший магазин');
 
       setStep('upload');
-      const photoUrl = await uploadShiftPhoto(
+      const photoUrl = await uploadPhoto(
         'shift-photos',
         `shifts/${userId}/${Date.now()}_start.jpg`,
         blob,
@@ -94,7 +94,7 @@ export function StartShiftClient({ userId, stores }: { userId: string; stores: S
       <ScreenHeader title="Начало смены" subtitle="Сфотографируйте рабочее место" />
 
       <div className="px-6 pt-6 space-y-5">
-        <PhotoCapture value={photo} onChange={setPhoto} />
+        <PhotoCapture value={photo} onChange={setPhoto} disabled={step !== 'idle'} />
 
         {/* Detected store (eager geo) */}
         {detected && (
@@ -116,10 +116,18 @@ export function StartShiftClient({ userId, stores }: { userId: string; stores: S
         <div className="bg-accent/5 border border-accent/20 rounded-2xl p-4">
           <p className="text-sm font-semibold text-accent">Что произойдёт после отправки?</p>
           <ul className="mt-3 space-y-2 text-sm text-foreground/80">
-            <li>📍 Определение вашего магазина по геолокации</li>
-            <li>🕐 Фиксация времени начала смены</li>
-            <li>📂 Сохранение фото рабочего места</li>
-            <li>🆔 Открытие смены с уникальным ID</li>
+            <li>
+              <span aria-hidden>📍</span> Определение вашего магазина по геолокации
+            </li>
+            <li>
+              <span aria-hidden>🕐</span> Фиксация времени начала смены
+            </li>
+            <li>
+              <span aria-hidden>📂</span> Сохранение фото рабочего места
+            </li>
+            <li>
+              <span aria-hidden>🆔</span> Открытие смены с уникальным ID
+            </li>
           </ul>
         </div>
 

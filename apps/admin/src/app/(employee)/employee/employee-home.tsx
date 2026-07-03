@@ -1,9 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import { useSyncExternalStore } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import { BarChart3, CheckCircle2, User, Wallet, Wrench } from 'lucide-react';
-import { formatDate, formatDateTime, formatKg } from '@tandyr/shared';
+import { formatKg } from '@tandyr/shared';
+import { initialsOf } from '@/lib/initials';
 
 /* Supabase without generated DB types infers nested selects as arrays;
    the server page pins these shapes via .returns<>(). */
@@ -56,22 +57,40 @@ function timeGreeting(): string {
   return 'Добрый вечер';
 }
 
-function initialsOf(name: string | null): string {
-  return (
-    (name ?? '?')
-      .split(' ')
-      .filter(Boolean)
-      .slice(0, 2)
-      .map((part) => part[0])
-      .join('')
-      .toUpperCase() || '?'
-  );
+/* Device-local formatting (shared formatDate/formatDateTime are UTC-pinned
+   for SSR stability — wrong wall-clock time for users east of UTC). Only
+   rendered after hydration, so no server/client mismatch. */
+function formatLocalDateTime(iso: string): string {
+  return new Date(iso).toLocaleString('ru-RU', {
+    day: '2-digit',
+    month: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function formatLocalDate(iso: string): string {
+  return new Date(iso).toLocaleDateString('ru-RU', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
 }
 
 export function EmployeeHome({ profile, openShift, recentShifts, started, ended }: Props) {
   const hydrated = useIsHydrated();
   const greet = hydrated ? timeGreeting() : 'Здравствуйте';
   const firstName = profile?.full_name?.split(' ')[0] || 'Сотрудник';
+
+  // Banner flags are captured once so the banner survives the URL cleanup
+  // below (reload/back won't re-show a stale "shift started" message).
+  const [showStarted] = useState(started);
+  const [showEnded] = useState(ended);
+  useEffect(() => {
+    if (showStarted || showEnded) {
+      window.history.replaceState(null, '', '/employee');
+    }
+  }, [showStarted, showEnded]);
 
   return (
     <div className="min-h-screen bg-background pb-10">
@@ -101,8 +120,8 @@ export function EmployeeHome({ profile, openShift, recentShifts, started, ended 
 
       <div className="px-6 pt-6 space-y-4">
         {/* Success banners */}
-        {started && <SuccessBanner text="Смена открыта! Хорошей работы." />}
-        {ended && <SuccessBanner text="Смена завершена! Отличная работа." />}
+        {showStarted && <SuccessBanner text="Смена открыта! Хорошей работы." />}
+        {showEnded && <SuccessBanner text="Смена завершена! Отличная работа." />}
 
         {/* Active shift / start CTA */}
         {openShift ? (
@@ -116,7 +135,7 @@ export function EmployeeHome({ profile, openShift, recentShifts, started, ended 
               <p className="text-sm text-muted-foreground mt-1">{openShift.store.address}</p>
             )}
             <p className="text-xs text-muted-foreground mt-2">
-              Начало: {formatDateTime(openShift.start_time)}
+              Начало: {hydrated ? formatLocalDateTime(openShift.start_time) : '…'}
             </p>
             <Link
               href="/employee/end-shift"
@@ -189,7 +208,7 @@ export function EmployeeHome({ profile, openShift, recentShifts, started, ended 
                       {shift.store?.name ?? '—'}
                     </p>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      {formatDate(shift.start_time)}
+                      {hydrated ? formatLocalDate(shift.start_time) : '…'}
                     </p>
                   </div>
                   {shift.production_kg !== null && (

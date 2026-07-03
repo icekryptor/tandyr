@@ -47,9 +47,10 @@ export default async function SalaryPage() {
     .eq('user_id', user.id)
     .order('week_year', { ascending: false })
     .order('week_number', { ascending: false })
-    .limit(20);
+    .limit(20)
+    .returns<SalaryRow[]>();
 
-  const salaries = (data ?? []) as SalaryRow[];
+  const salaries = data ?? [];
   const latest = salaries[0];
   const history = salaries.slice(1);
 

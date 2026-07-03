@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/client';
+import { ruError } from '@/lib/ru-error';
 
 /** Backoff delays for the 2 retries after the initial attempt. */
 const RETRY_DELAYS_MS = [1000, 3000];
@@ -9,7 +10,7 @@ const RETRY_DELAYS_MS = [1000, 3000];
  * the public URL. Retries transient/network failures with backoff;
  * client errors (4xx — RLS denied, duplicate path, too large) fail fast.
  */
-export async function uploadShiftPhoto(bucket: string, path: string, blob: Blob): Promise<string> {
+export async function uploadPhoto(bucket: string, path: string, blob: Blob): Promise<string> {
   const supabase = createClient();
 
   for (let attempt = 0; ; attempt++) {
@@ -24,11 +25,11 @@ export async function uploadShiftPhoto(bucket: string, path: string, blob: Blob)
       if (!error) {
         return supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl;
       }
-      message = error.message || 'Не удалось загрузить фото';
+      message = error.message ? ruError(error.message) : 'Не удалось загрузить фото';
       retriable = !isClientError(error);
     } catch (err: unknown) {
       // Thrown errors (fetch TypeError etc.) are network-level — retriable.
-      message = err instanceof Error ? err.message : 'Не удалось загрузить фото';
+      message = err instanceof Error && err.message ? ruError(err.message) : 'Не удалось загрузить фото';
       retriable = true;
     }
 

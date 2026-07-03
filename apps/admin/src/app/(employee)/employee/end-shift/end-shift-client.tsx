@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { PhotoCapture } from '@/components/photo-capture';
 import { compressImage } from '@/lib/compress-image';
 import { getPosition } from '@/lib/geolocation';
-import { uploadShiftPhoto } from '@/lib/upload-photo';
+import { uploadPhoto } from '@/lib/upload-photo';
 import { endShift } from '../actions';
 import { ScreenHeader } from '../screen-header';
 
@@ -47,7 +47,7 @@ export function EndShiftClient({ userId, shiftId }: { userId: string; shiftId: s
       const pos = await getPosition();
 
       setStep('upload');
-      const photoUrl = await uploadShiftPhoto(
+      const photoUrl = await uploadPhoto(
         'shift-photos',
         `shifts/${userId}/${Date.now()}_end.jpg`,
         blob,
@@ -81,7 +81,7 @@ export function EndShiftClient({ userId, shiftId }: { userId: string; shiftId: s
       <div className="px-6 pt-6 space-y-5">
         <div className="space-y-2">
           <Label className="text-sm font-semibold">Фото продукции / рабочего места</Label>
-          <PhotoCapture value={photo} onChange={setPhoto} />
+          <PhotoCapture value={photo} onChange={setPhoto} disabled={step !== 'idle'} />
         </div>
 
         <div className="space-y-2">

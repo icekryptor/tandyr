@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { PhotoCapture } from '@/components/photo-capture';
 import { compressImage } from '@/lib/compress-image';
-import { uploadShiftPhoto } from '@/lib/upload-photo';
+import { uploadPhoto } from '@/lib/upload-photo';
 import { submitTechRequest } from '../actions';
 import { ScreenHeader } from '../screen-header';
 import { SuccessScreen } from '../success-screen';
@@ -46,7 +46,7 @@ export function TechRequestClient({ userId }: { userId: string }) {
         setStep('compress');
         const blob = await compressImage(photo);
         setStep('upload');
-        photoUrl = await uploadShiftPhoto(
+        photoUrl = await uploadPhoto(
           'tech-request-photos',
           `tech-requests/${userId}/${Date.now()}.jpg`,
           blob,
@@ -75,7 +75,12 @@ export function TechRequestClient({ userId }: { userId: string }) {
       <div className="px-6 pt-6 space-y-5">
         <div className="space-y-2">
           <Label className="text-sm font-semibold">Фото (необязательно)</Label>
-          <PhotoCapture value={photo} onChange={setPhoto} label="Добавить фото" />
+          <PhotoCapture
+            value={photo}
+            onChange={setPhoto}
+            label="Добавить фото"
+            disabled={step !== 'idle'}
+          />
         </div>
 
         <div className="space-y-2">

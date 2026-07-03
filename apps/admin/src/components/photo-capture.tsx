@@ -8,6 +8,8 @@ interface PhotoCaptureProps {
   value: File | null;
   onChange: (file: File | null) => void;
   label?: string;
+  /** Freeze the capture UI (e.g. while the parent flow is submitting). */
+  disabled?: boolean;
 }
 
 /**
@@ -15,7 +17,12 @@ interface PhotoCaptureProps {
  * behind a dashed tap card. On Android/iOS mobile browsers this opens the
  * rear camera directly (web equivalent of ImagePicker.launchCameraAsync).
  */
-export function PhotoCapture({ value, onChange, label = 'Сделать фото' }: PhotoCaptureProps) {
+export function PhotoCapture({
+  value,
+  onChange,
+  label = 'Сделать фото',
+  disabled = false,
+}: PhotoCaptureProps) {
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Object URL is derived from the file; the effect below revokes it when
@@ -26,7 +33,12 @@ export function PhotoCapture({ value, onChange, label = 'Сделать фото
     return () => URL.revokeObjectURL(previewUrl);
   }, [previewUrl]);
 
-  const openCamera = () => inputRef.current?.click();
+  const openCamera = () => {
+    if (disabled) return;
+    inputRef.current?.click();
+  };
+
+  const disabledClass = disabled ? 'opacity-60 pointer-events-none' : '';
 
   return (
     <div className="space-y-2">
@@ -36,6 +48,7 @@ export function PhotoCapture({ value, onChange, label = 'Сделать фото
         accept="image/*"
         capture="environment"
         className="hidden"
+        disabled={disabled}
         onChange={(e) => {
           const file = e.target.files?.[0] ?? null;
           if (file) onChange(file);
@@ -47,8 +60,9 @@ export function PhotoCapture({ value, onChange, label = 'Сделать фото
       <button
         type="button"
         onClick={openCamera}
+        disabled={disabled}
         aria-label={label}
-        className="w-full h-60 bg-card border-2 border-dashed border-border rounded-2xl flex items-center justify-center overflow-hidden hover:border-primary/40 transition-colors"
+        className={`w-full h-60 bg-card border-2 border-dashed border-border rounded-2xl flex items-center justify-center overflow-hidden hover:border-primary/40 transition-colors ${disabledClass}`}
       >
         {previewUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -65,7 +79,13 @@ export function PhotoCapture({ value, onChange, label = 'Сделать фото
       </button>
 
       {value && (
-        <Button type="button" variant="secondary" className="w-full h-11" onClick={openCamera}>
+        <Button
+          type="button"
+          variant="secondary"
+          disabled={disabled}
+          className={`w-full h-11 ${disabledClass}`}
+          onClick={openCamera}
+        >
           Переснять фото
         </Button>
       )}
