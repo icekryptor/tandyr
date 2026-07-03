@@ -12,7 +12,13 @@ import {
   Building2, Hash, User, Wrench, MapPinned,
 } from 'lucide-react';
 import { updateStore, deleteStore, updateResource } from '../actions';
-import { YandexMapPicker } from '@/components/yandex-map-picker';
+import nextDynamic from 'next/dynamic';
+
+// Dialog-gated: only loaded when the edit dialog opens
+const YandexMapPicker = nextDynamic(
+  () => import('@/components/yandex-map-picker').then((m) => m.YandexMapPicker),
+  { ssr: false, loading: () => <p className="text-sm text-muted-foreground">Загрузка карты…</p> },
+);
 import { CHAIN_LABELS, RESOURCE_LABELS } from '@tandyr/shared';
 import type { Store, StoreResource } from '@tandyr/shared';
 

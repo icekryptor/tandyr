@@ -8,7 +8,13 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Plus, Trash2, MapPin, Mail, Phone, ChevronRight } from 'lucide-react';
 import { createStore, deleteStore } from './actions';
-import { YandexMapPicker } from '@/components/yandex-map-picker';
+import nextDynamic from 'next/dynamic';
+
+// Dialog-gated: only loaded when the create dialog opens
+const YandexMapPicker = nextDynamic(
+  () => import('@/components/yandex-map-picker').then((m) => m.YandexMapPicker),
+  { ssr: false, loading: () => <p className="text-sm text-muted-foreground">Загрузка карты…</p> },
+);
 import { CHAIN_LABELS, pluralize } from '@tandyr/shared';
 import type { Store } from '@tandyr/shared';
 
