@@ -11,10 +11,13 @@
  *
  * Bump CACHE_VERSION whenever the shell pages change shape.
  */
-const CACHE_VERSION = 'v1';
+const CACHE_VERSION = 'v2';
 const SHELL_CACHE = `tandyr-shell-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `tandyr-runtime-${CACHE_VERSION}`;
-const SHELL_URLS = ['/offline', '/employee'];
+// Only the offline fallback. Never precache authenticated pages: addAll
+// sends cookies, so a logged-in install would snapshot one user's HTML
+// into Cache Storage (and a logged-out one would store /login junk).
+const SHELL_URLS = ['/offline'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(

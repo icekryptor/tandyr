@@ -2,6 +2,7 @@ import type { MetadataRoute } from 'next';
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
+    id: '/employee',
     name: 'Tandyr',
     short_name: 'Tandyr',
     description: 'Управление сменами пекарни',
