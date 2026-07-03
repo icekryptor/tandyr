@@ -11,7 +11,10 @@ export default async function StoresPage() {
 
   let stores = initial.data;
   if (initial.error) {
-    const fallback = await supabase.from('stores').select('*').order('name');
+    const fallback = await supabase
+      .from('stores')
+      .select('id, store_number, name, address, city, city_id, latitude, longitude, chain, contact_email, contact_phone, manager_id, tech_specialist_id, created_at')
+      .order('name');
     stores = fallback.data;
   }
 

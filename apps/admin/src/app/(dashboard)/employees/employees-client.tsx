@@ -18,8 +18,12 @@ import { createEmployee, createInvite, toggleEmployeeStatus } from './actions';
 import { COMPANY_ROLE_LABELS, COMPANY_ROLES, COMPANY_ROLE_COLORS, pluralize } from '@tandyr/shared';
 import type { User, Store } from '@tandyr/shared';
 
+export type EmployeeListItem = Pick<User, 'id' | 'full_name' | 'email' | 'phone' | 'company_role' | 'is_active'> & {
+  store: { name: string } | null;
+};
+
 interface Props {
-  employees: (User & { store: { name: string } | null })[];
+  employees: EmployeeListItem[];
   stores: Pick<Store, 'id' | 'name'>[];
 }
 

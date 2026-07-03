@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { formatDateTime, formatKg, SHIFT_STATUS_LABELS, pluralize } from '@tandyr/shared';
 import type { Shift, Store } from '@tandyr/shared';
 
-type ShiftRow = Shift & {
+export type ShiftRow = Pick<Shift, 'id' | 'shift_number' | 'status' | 'start_time' | 'end_time' | 'production_kg' | 'accrual' | 'fine'> & {
   user: { id: string; full_name: string; email: string } | null;
   store: { id: string; name: string } | null;
 };

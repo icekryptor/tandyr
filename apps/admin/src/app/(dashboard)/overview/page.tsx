@@ -83,9 +83,10 @@ export default async function DashboardPage() {
     supabase.from('tech_requests').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
     supabase
       .from('shifts')
-      .select('*, user:users(full_name), store:stores(name)')
+      .select('id, status, production_kg, user:users(full_name), store:stores(name)')
       .order('created_at', { ascending: false })
-      .limit(5),
+      .limit(5)
+      .returns<{ id: string; status: string; production_kg: number | null; user: { full_name: string } | null; store: { name: string } | null }[]>(),
     supabase
       .from('shifts')
       .select('production_kg, created_at')

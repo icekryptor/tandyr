@@ -36,12 +36,12 @@ export default async function ChatRoomPage({ params }: { params: Promise<{ id: s
   const [{ data: room }, { data: messages }, { data: members }] = await Promise.all([
     admin
       .from('chat_rooms')
-      .select('*')
+      .select('id, name, room_type')
       .eq('id', id)
       .single(),
     admin
       .from('messages')
-      .select('*, user:users(id, full_name, avatar_url)')
+      .select('id, room_id, user_id, content, media_url, media_type, edited_at, is_deleted, created_at, user:users(id, full_name, avatar_url)')
       .eq('room_id', id)
       .order('created_at', { ascending: true })
       .limit(200)

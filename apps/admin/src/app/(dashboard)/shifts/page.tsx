@@ -2,7 +2,7 @@
 export const dynamic = 'force-dynamic';
 
 import { createClient as createAdminClient } from '@supabase/supabase-js';
-import { ShiftsClient } from './shifts-client';
+import { ShiftsClient, type ShiftRow } from './shifts-client';
 
 export default async function ShiftsPage({
   searchParams,
@@ -18,7 +18,7 @@ export default async function ShiftsPage({
 
   let query = admin
     .from('shifts')
-    .select('*, user:users(id, full_name, email), store:stores(id, name)')
+    .select('id, shift_number, status, start_time, end_time, production_kg, accrual, fine, user:users(id, full_name, email), store:stores(id, name)')
     .order('created_at', { ascending: false })
     .limit(200);
 
@@ -31,7 +31,7 @@ export default async function ShiftsPage({
   }
 
   const [{ data: shifts }, { data: stores }] = await Promise.all([
-    query,
+    query.returns<ShiftRow[]>(),
     admin.from('stores').select('id, name').order('name'),
   ]);
 
