@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import { Manrope } from 'next/font/google';
+import { SwRegister } from '@/components/sw-register';
 import './globals.css';
 
 const manrope = Manrope({
@@ -33,6 +34,7 @@ export default function RootLayout({
     <html lang="ru" suppressHydrationWarning>
       <body className={`${manrope.variable} font-sans antialiased bg-background`}>
         {children}
+        <SwRegister />
       </body>
     </html>
   );

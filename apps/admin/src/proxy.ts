@@ -2,6 +2,15 @@ import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
 export async function proxy(request: NextRequest) {
+  // PWA plumbing must bypass auth entirely: the browser fetches the manifest
+  // without credentials (a redirect to /login breaks installability), SW
+  // update checks for /sw.js must never see a redirect, and the offline
+  // fallback has to be cacheable by the SW for logged-out users too.
+  const PWA_PUBLIC_PATHS = ['/manifest.webmanifest', '/sw.js', '/offline'];
+  if (PWA_PUBLIC_PATHS.includes(request.nextUrl.pathname)) {
+    return NextResponse.next({ request });
+  }
+
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(
