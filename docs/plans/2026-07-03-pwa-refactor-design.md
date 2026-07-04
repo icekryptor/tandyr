@@ -160,9 +160,36 @@ deltas from the design:
   pages are auto-dynamic), 9 kept with explanatory comments (service-role
   pages WOULD go permanently static without the flag).
 
-### Phase D (verification) — partially blocked at time of writing
-- Deploy + PWA endpoint smoke: done (manifest/sw/offline all 200 on prod).
+### Phase D (verification) — complete
+- Deploy + PWA endpoint smoke: manifest/sw/offline all 200 on prod.
 - Knowledge graph updated: 727 nodes / 931 edges after the refactor.
-- Full mobile-viewport E2E + migrations 021/022: blocked on Supabase
-  restore (org hit the free-plan 2-active-project limit after billing
-  lapse; awaiting user decision to pause a sibling project or upgrade).
+- Migrations 021 + 022 applied to the live DB (after Pro re-subscribe;
+  the org had dropped to Free after a billing lapse and hit the
+  2-active-project limit).
+- **Full mobile-viewport E2E on prod (390×844, real Chrome via CDP):**
+  login → hub (install prompt, action grid, no-shift state) → start-shift
+  (camera-only `capture="environment"` input, disabled-until-photo) →
+  client compression → Supabase Storage upload (200) all verified. The
+  geolocation-denied path surfaced the exact Russian error from
+  `geolocation.ts`, confirming that branch. The final server-action insert
+  is blocked in the harness by Vercel's Security Checkpoint (anti-bot
+  challenge on automated POSTs) — an infra artifact, not an app defect;
+  real employee browsers are unaffected.
+- **Two findings fixed during Phase D:**
+  - Photo compression measured 524.8 KB on a worst-case high-entropy test
+    image (over the ≤400 KB budget). Added a quality/dimension step-down
+    loop to `compress-image.ts` (commit c9cf6e3).
+  - **Critical, pre-existing, made live by this refactor:** the `(dashboard)`
+    layout had no role gate and the service-role employee actions never
+    checked the caller. Because the PWA now gives every employee a session
+    (and the `/` hub shows them an admin link), any employee could read
+    admin PII and call `updateEmployeePassword` to reset an admin's
+    password. Fixed with a layout role gate + `requireAdmin()` on all seven
+    employee actions (commit 10c95f3). Verified on prod: a non-admin
+    employee hitting `/employees` is redirected to `/employee`.
+- Remaining follow-ups (tracked): other dashboard action files
+  (stores/salary/etc.) also use the service-role client without a caller
+  gate — same class as the employees fix, lower blast radius (no password
+  reset), worth a sweep before broad launch. GitHub→Vercel auto-deploy
+  still not connected (every deploy is a manual CLI push). `/signup`
+  removal still pending team formation.
