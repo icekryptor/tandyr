@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { createClient } from '@/lib/supabase/client';
 import { compressImage } from '@/lib/compress-image';
 import { initialsOf } from '@/lib/initials';
+import { ruError } from '@/lib/ru-error';
 import { uploadPhoto } from '@/lib/upload-photo';
 import { updateProfile } from '../actions';
 import { ScreenHeader } from '../screen-header';
@@ -53,7 +54,7 @@ export function ProfileClient({ profile }: { profile: ProfileRow }) {
         .from('users')
         .update({ avatar_url: url })
         .eq('id', profile.id);
-      if (updateError) throw new Error(updateError.message);
+      if (updateError) throw new Error(ruError(updateError.message));
 
       router.refresh();
     } catch (err: unknown) {
