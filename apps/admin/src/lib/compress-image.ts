@@ -4,9 +4,17 @@
  * Camera photos on budget Android devices are 3–8 MB; compressing to
  * max 1600px JPEG q0.7 (~150–350 KB) is the single biggest flow-speed win
  * on weak store Wi-Fi / LTE.
+ *
+ * The encoder steps quality (and, if needed, dimensions) down until the
+ * result is under TARGET_BYTES, so even worst-case high-entropy shots stay
+ * within the storage/network budget. It never fails the upload — if the
+ * floor is still over target, it returns the smallest blob it produced.
  */
 
 const SKIP_SIZE_BYTES = 300_000;
+const TARGET_BYTES = 400_000;
+// First encode uses the caller's quality; these are the step-down fallbacks.
+const QUALITY_LADDER = [0.6, 0.5, 0.42];
 
 interface CompressOptions {
   maxDim?: number;
@@ -62,13 +70,12 @@ function compressViaImgElement(file: File, maxDim: number, quality: number): Pro
   });
 }
 
-async function drawToJpeg(
+function renderCanvas(
   source: CanvasImageSource,
   srcWidth: number,
   srcHeight: number,
   maxDim: number,
-  quality: number,
-): Promise<Blob> {
+): HTMLCanvasElement {
   const scale = Math.min(1, maxDim / Math.max(srcWidth, srcHeight));
   const width = Math.max(1, Math.round(srcWidth * scale));
   const height = Math.max(1, Math.round(srcHeight * scale));
@@ -79,7 +86,10 @@ async function drawToJpeg(
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('Не удалось обработать изображение');
   ctx.drawImage(source, 0, 0, width, height);
+  return canvas;
+}
 
+function toJpegBlob(canvas: HTMLCanvasElement, quality: number): Promise<Blob> {
   return new Promise<Blob>((resolve, reject) => {
     canvas.toBlob(
       (blob) => {
@@ -90,4 +100,33 @@ async function drawToJpeg(
       quality,
     );
   });
+}
+
+async function drawToJpeg(
+  source: CanvasImageSource,
+  srcWidth: number,
+  srcHeight: number,
+  maxDim: number,
+  quality: number,
+): Promise<Blob> {
+  const canvas = renderCanvas(source, srcWidth, srcHeight, maxDim);
+
+  // First pass at the requested quality; step quality down until under target.
+  let best = await toJpegBlob(canvas, quality);
+  if (best.size <= TARGET_BYTES) return best;
+
+  for (const q of QUALITY_LADDER) {
+    if (q >= quality) continue; // only step down
+    const blob = await toJpegBlob(canvas, q);
+    if (blob.size < best.size) best = blob;
+    if (best.size <= TARGET_BYTES) return best;
+  }
+
+  // Still too big (rare, high-entropy shots): shrink dimensions and retry once.
+  const smaller = renderCanvas(source, srcWidth, srcHeight, Math.round(maxDim * 0.75));
+  const shrunk = await toJpegBlob(smaller, 0.5);
+  if (shrunk.size < best.size) best = shrunk;
+
+  // Return best effort even if marginally over — a large photo beats no shift.
+  return best;
 }
