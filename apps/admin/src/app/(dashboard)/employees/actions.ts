@@ -6,7 +6,35 @@ import { updateUserProfileWithTriggerRetry } from '@/lib/supabase/profile-update
 import { revalidatePath } from 'next/cache';
 import { nullifyEmpty, safeFloat } from '@tandyr/shared';
 
+/**
+ * Verify the caller is an admin. Server actions can be POSTed directly,
+ * bypassing the (dashboard) layout's role gate — so every service-role
+ * mutation here must re-check. Without this, any authenticated employee
+ * could e.g. reset an admin's password via updateEmployeePassword.
+ */
+async function requireAdmin(): Promise<{ ok: true } | { ok: false; error: string }> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: 'Не авторизованы' };
+
+  const admin = createAdminClient();
+  const { data: me } = await admin
+    .from('users')
+    .select('role, company_role')
+    .eq('id', user.id)
+    .single();
+  const isSystemAdmin = me?.role === 'admin';
+  const isBusinessAdmin = ['owner', 'admin'].includes(me?.company_role ?? '');
+  if (!me || (!isSystemAdmin && !isBusinessAdmin)) {
+    return { ok: false, error: 'Недостаточно прав' };
+  }
+  return { ok: true };
+}
+
 export async function createEmployee(formData: FormData) {
+  const gate = await requireAdmin();
+  if (!gate.ok) return { error: gate.error };
+
   const admin = createAdminClient();
 
   const full_name = formData.get('full_name') as string;
@@ -49,6 +77,9 @@ export async function createEmployee(formData: FormData) {
 }
 
 export async function updateEmployee(id: string, formData: FormData) {
+  const gate = await requireAdmin();
+  if (!gate.ok) return { error: gate.error };
+
   const supabase = await createClient();
 
   const str = (key: string) => nullifyEmpty(formData.get(key) as string);
@@ -84,6 +115,9 @@ export async function updateEmployee(id: string, formData: FormData) {
 }
 
 export async function updateEmployeePassword(id: string, formData: FormData) {
+  const gate = await requireAdmin();
+  if (!gate.ok) return { error: gate.error };
+
   const admin = createAdminClient();
   const password = formData.get('password') as string;
 
@@ -95,6 +129,9 @@ export async function updateEmployeePassword(id: string, formData: FormData) {
 }
 
 export async function deleteEmployee(id: string) {
+  const gate = await requireAdmin();
+  if (!gate.ok) return { error: gate.error };
+
   const admin = createAdminClient();
   const { error } = await admin.auth.admin.deleteUser(id);
   if (error) return { error: error.message };
@@ -104,6 +141,9 @@ export async function deleteEmployee(id: string) {
 }
 
 export async function toggleEmployeeStatus(id: string, isActive: boolean) {
+  const gate = await requireAdmin();
+  if (!gate.ok) return { error: gate.error };
+
   const supabase = await createClient();
   const { error } = await supabase.from('users').update({ is_active: !isActive }).eq('id', id);
   if (error) return { error: error.message };
@@ -113,6 +153,9 @@ export async function toggleEmployeeStatus(id: string, isActive: boolean) {
 }
 
 export async function updateEmployeeCities(userId: string, cityIds: string[]) {
+  const gate = await requireAdmin();
+  if (!gate.ok) return { error: gate.error };
+
   const admin = createAdminClient();
 
   // Delete existing, then re-insert
@@ -170,6 +213,9 @@ export async function createInvite(input: {
 }
 
 export async function uploadEmployeeFile(id: string, formData: FormData) {
+  const gate = await requireAdmin();
+  if (!gate.ok) return { error: gate.error };
+
   const admin = createAdminClient();
   const file = formData.get('file') as File;
   const field = formData.get('field') as 'contract' | 'passport';
