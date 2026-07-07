@@ -27,13 +27,20 @@ function SignupFormInner() {
     setError(null);
     setLoading(true);
     const formData = new FormData(event.currentTarget);
-    const result = await signUpAdmin(formData);
-    if (result.ok) {
-      router.replace('/login?signup=1');
-    } else {
+    try {
+      const result = await signUpAdmin(formData);
+      if (result.ok) {
+        // Keep the spinner through navigation.
+        router.replace('/login?signup=1');
+        return;
+      }
       setError(result.error);
-      setLoading(false);
+    } catch {
+      // Server action rejected (network drop, or a redeploy invalidated the
+      // action id). Without this, the button spins forever ("зависает").
+      setError('Не удалось зарегистрироваться. Проверьте соединение и попробуйте ещё раз.');
     }
+    setLoading(false);
   };
 
   return (

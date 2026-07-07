@@ -46,14 +46,20 @@ function InviteFormInner({
     formData.set('token', token);
     if (!preStoreId) formData.set('store_id', storeId && storeId !== '__none__' ? storeId : '');
     if (!preRole) formData.set('company_role', role && role !== '__none__' ? role : '');
-    const result = await acceptInvite(formData);
-    if (result.ok) {
-      setSuccess(true);
-      setTimeout(() => router.replace('/login?invited=1'), 1500);
-    } else {
+    try {
+      const result = await acceptInvite(formData);
+      if (result.ok) {
+        setSuccess(true);
+        setTimeout(() => router.replace('/login?invited=1'), 1500);
+        return;
+      }
       setError(result.error);
-      setLoading(false);
+    } catch {
+      // Server action rejected (network drop / redeploy invalidated the
+      // action id). Without this the button spins forever ("зависает").
+      setError('Не удалось завершить регистрацию. Проверьте соединение и попробуйте ещё раз.');
     }
+    setLoading(false);
   };
 
   if (success) {
