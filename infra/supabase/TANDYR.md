@@ -97,6 +97,33 @@ docker compose -f ../admin/docker-compose.yml up -d --build
 - Обновить код: rsync в `/opt/tandyr`, затем `sh scripts/migrate.sh` и
   пересобрать админку той же командой `up -d --build`.
 
+## Публичное демо
+
+Пока в базе только тестовые данные, https://tandyr.aics-93.ru открыт без
+пароля. Каждый посетитель без сессии автоматически входит как
+`demo@tandyr.aics-93.ru` (admin/owner). Это делает `/api/demo-login`:
+сервер выпускает magic link через service role и сразу подтверждает его,
+письма никуда не уходят. Включается переменной `DEMO_USER_ID` в
+`infra/admin/.env`. Страницы `/login`, `/signup` и `/invite` в режиме демо
+недоступны, ответы помечены `X-Robots-Tag: noindex`.
+
+**Закрыть демо до загрузки реальных данных.** Посетитель мог сохранить себе
+доступ: скопировать refresh-токен, сменить пароль демо-аккаунта, завести
+своих админов или инвайты. Поэтому одной переменной мало:
+
+1. Удалить `DEMO_USER_ID` из `infra/admin/.env` и выполнить
+   `docker compose -f infra/admin/docker-compose.yml up -d`. Именно `up`:
+   при `restart` контейнер не перечитывает env.
+2. Лучше всего начать базу с нуля: `docker compose down -v && rm -rf volumes/db/data`
+   в `infra/supabase`, затем `run.sh start`, `migrate`, `schedule-functions`,
+   `create-admin`. Ключи в `.env` при этом сохранятся.
+3. Если базу не сносить, то:
+   - удалить демо-пользователя и всех, кто создан за время демо;
+   - проверить `role` и `company_role` у оставшихся;
+   - удалить инвайты;
+   - выставить `open_signup_enabled = false`;
+   - удалить файлы из Storage через API, а не SQL-запросом.
+
 Бэкапы: каталог `volumes/db/data` (Postgres) плюс docker-том
 `tandyr-supabase_storage-data` (файлы). Самое простое — ночной
 `docker compose exec db pg_dump -U postgres` и `rsync` тома.

@@ -44,6 +44,17 @@ export async function proxy(request: NextRequest) {
     return supabaseResponse;
   }
 
+  // Public demo (DEMO_USER_ID set): sign visitors in instead of asking for a
+  // password. Auth pages are skipped too, so open signup isn't exposed.
+  if (!user && process.env.DEMO_USER_ID) {
+    const demoLogin = new URL('/api/demo-login', request.url);
+    demoLogin.searchParams.set(
+      'next',
+      isAuthRoute ? '/' : request.nextUrl.pathname + request.nextUrl.search,
+    );
+    return NextResponse.redirect(demoLogin);
+  }
+
   if (!user && !isAuthRoute) {
     return NextResponse.redirect(new URL('/login', request.url));
   }
@@ -52,6 +63,9 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL('/', request.url));
   }
 
+  if (process.env.DEMO_USER_ID) {
+    supabaseResponse.headers.set('X-Robots-Tag', 'noindex, nofollow');
+  }
   return supabaseResponse;
 }
 

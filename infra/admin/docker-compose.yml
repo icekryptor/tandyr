@@ -21,6 +21,9 @@ services:
     restart: unless-stopped
     environment:
       SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:?run app-env.sh first}
+      # Public demo: visitors are signed in as this user (apps/admin/src/app/api/demo-login).
+      # Leave empty to require a real login.
+      DEMO_USER_ID: ${DEMO_USER_ID:-}
     mem_limit: 512m
     networks: [proxy]
 
