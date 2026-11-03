@@ -86,8 +86,8 @@ export interface Shift {
   user_id: string;
   store_id: string;
   start_photo_url: string;
-  start_lat: number;
-  start_lng: number;
+  start_lat: number | null;
+  start_lng: number | null;
   start_time: string;
   end_photo_url: string | null;
   end_lat: number | null;

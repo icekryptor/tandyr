@@ -72,8 +72,18 @@ function PhotoCard({ url, label }: { url: string | null; label: string }) {
   );
 }
 
-function GeoBlock({ lat, lng, label }: { lat: number | null; lng: number | null; label: string }) {
-  if (!lat || !lng) return <InfoRow label={label} value={null} />;
+function GeoBlock({
+  lat,
+  lng,
+  label,
+  missing,
+}: {
+  lat: number | null;
+  lng: number | null;
+  label: string;
+  missing?: string;
+}) {
+  if (lat == null || lng == null) return <InfoRow label={label} value={missing ?? null} />;
   return (
     <div>
       <p className="text-[11px] text-muted-foreground mb-1">{label}</p>
@@ -209,7 +219,12 @@ export function ShiftDetailClient({ shift }: { shift: ShiftFull }) {
         <SectionCard icon={CalendarClock} title="Открытие смены">
           <div className="space-y-4">
             <InfoRow label="Дата и время" value={formatDateTime(shift.start_time)} />
-            <GeoBlock lat={shift.start_lat} lng={shift.start_lng} label="Геолокация" />
+            <GeoBlock
+              lat={shift.start_lat}
+              lng={shift.start_lng}
+              label="Геолокация"
+              missing="Не определена — магазин выбран вручную"
+            />
             <PhotoCard url={shift.start_photo_url} label="Фото при открытии" />
           </div>
         </SectionCard>
