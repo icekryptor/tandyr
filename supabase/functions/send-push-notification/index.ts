@@ -13,6 +13,7 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { buildMessages, sendPushBatch } from '../_shared/push.ts';
+import { requireServiceRole } from '../_shared/auth.ts';
 
 interface RequestBody {
   user_id?: string;
@@ -26,6 +27,9 @@ Deno.serve(async (req) => {
   if (req.method !== 'POST') {
     return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405 });
   }
+
+  const denied = requireServiceRole(req);
+  if (denied) return denied;
 
   let body: RequestBody;
   try {

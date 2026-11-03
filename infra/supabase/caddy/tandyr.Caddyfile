@@ -1,0 +1,24 @@
+# Tandyr site block for the host's shared Caddy (see TANDYR.md, "общий Caddy").
+# API paths go to the Tandyr gateway on the supabase_default bridge gateway;
+# everything else is the admin app. /functions/v1 stays internal (pg_cron).
+tandyr.aics-93.ru {
+    @supabase_api path /auth/v1/* /rest/v1/* /realtime/v1/* /storage/v1/*
+    handle @supabase_api {
+        reverse_proxy 172.18.0.1:8100
+    }
+    handle {
+        encode zstd gzip
+        reverse_proxy tandyr-admin:3000 {
+            header_up X-Real-IP {remote_host}
+        }
+    }
+    @next_static path /_next/static/*
+    header @next_static Cache-Control "public, max-age=31536000, immutable"
+    header {
+        Strict-Transport-Security "max-age=31536000"
+        X-Frame-Options DENY
+        X-Content-Type-Options nosniff
+        Referrer-Policy strict-origin-when-cross-origin
+        -server
+    }
+}

@@ -9,6 +9,7 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { buildMessages, sendPushBatch } from '../_shared/push.ts';
+import { requireServiceRole } from '../_shared/auth.ts';
 
 function getISOWeekAndYear(date: Date): { week: number; year: number } {
   const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
@@ -168,6 +169,9 @@ async function markOverdueActs(supabase: ReturnType<typeof createClient>): Promi
 }
 
 Deno.serve(async (req) => {
+  const denied = requireServiceRole(req);
+  if (denied) return denied;
+
   let action: 'create' | 'mark_overdue' | null = null;
 
   if (req.method === 'POST') {

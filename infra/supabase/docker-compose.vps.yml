@@ -1,0 +1,24 @@
+# VPS behind a reverse proxy that is already running on the host (one Caddy
+# serving several sites), layered after docker-compose.tandyr.yml.
+#
+# - The API gateway publishes on ${TANDYR_API_BIND}:${TANDYR_API_PORT} only.
+#   Set the bind address to the gateway IP of the proxy's Docker network
+#   (e.g. 172.18.0.1): the proxy reaches it, the internet does not. The proxy
+#   must not join this stack's network: service names like `api-gw` and `auth`
+#   would clash with another Supabase install on the same host.
+# - Studio, postgres-meta and Supavisor stay off (~600 MB RAM). Postgres is
+#   reached with `docker compose exec db psql`. Studio on demand:
+#   `docker compose --profile studio up -d studio meta`.
+
+services:
+  studio:
+    profiles: [studio]
+  meta:
+    profiles: [studio]
+  supavisor:
+    profiles: [pooler]
+  api-gw:
+    # Upstream waits for Studio; Envoy resolves its upstreams lazily anyway.
+    depends_on: !reset {}
+    ports: !override
+      - ${TANDYR_API_BIND:-127.0.0.1}:${TANDYR_API_PORT:-8100}:8000/tcp

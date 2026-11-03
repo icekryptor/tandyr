@@ -92,6 +92,11 @@ DO $$ BEGIN
 END $$;
 
 -- ─── tech_requests: filter by store city ─────────────────────────────────────
+-- The policy below needs store_id, which 016 (FIX 1) adds; add it here too so a
+-- fresh database migrates in order. 016 keeps its IF NOT EXISTS + backfill.
+ALTER TABLE tech_requests
+  ADD COLUMN IF NOT EXISTS store_id UUID REFERENCES stores(id) ON DELETE SET NULL;
+
 DO $$ BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM pg_policies WHERE tablename = 'tech_requests' AND policyname = 'tech_requests_city_filtered'

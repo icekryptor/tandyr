@@ -1,0 +1,11 @@
+**/node_modules
+**/.next
+**/.turbo
+**/.env*
+**/tsconfig.tsbuildinfo
+.git
+.claude
+apps/mobile
+infra
+supabase
+docs

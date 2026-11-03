@@ -1,0 +1,3 @@
+# Keep env files (service-role key) out of every Docker build context.
+**/.env*
+**/node_modules
