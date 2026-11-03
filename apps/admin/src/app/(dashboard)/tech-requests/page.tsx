@@ -6,7 +6,7 @@ export default async function TechRequestsPage() {
 
   const { data: requests } = await supabase
     .from('tech_requests')
-    .select('*, user:users(id, full_name, email), store:stores(id, name)')
+    .select('*, user:users!tech_requests_user_id_fkey(id, full_name, email), store:stores(id, name)')
     .order('created_at', { ascending: false });
 
   return <TechRequestsClient requests={requests ?? []} />;
