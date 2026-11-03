@@ -1,0 +1,30 @@
+# Tandyr admin on a host whose reverse proxy runs in Docker (see
+# infra/supabase/TANDYR.md, "VPS"). The container joins a small network shared
+# only with the proxy (not the proxy's own network, where other projects'
+# databases live); nothing is published on the host.
+#   docker network create tandyr_edge && docker network connect tandyr_edge supabase-caddy
+#
+# .env next to this file (mode 600) comes from
+#   sh infra/supabase/scripts/app-env.sh infra/admin/.env
+name: tandyr-admin
+
+services:
+  tandyr-admin:
+    container_name: tandyr-admin
+    build:
+      context: ../..
+      dockerfile: infra/admin/Dockerfile
+      args:
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:?run app-env.sh first}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:?run app-env.sh first}
+    image: tandyr-admin:latest
+    restart: unless-stopped
+    environment:
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:?run app-env.sh first}
+    mem_limit: 512m
+    networks: [proxy]
+
+networks:
+  proxy:
+    name: ${PROXY_NETWORK:-tandyr_edge}
+    external: true

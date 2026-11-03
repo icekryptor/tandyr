@@ -1,0 +1,64 @@
+# Tandyr overrides on top of the upstream self-hosted stack (docker-compose.yml).
+# Layered via COMPOSE_FILE in .env; keep upstream files untouched so update.sh
+# can pull new releases cleanly.
+
+# Own project, network and container names, so the stack can share a Docker
+# host with other Supabase installs (upstream hardcodes `supabase-*` names).
+name: tandyr-supabase
+
+services:
+  studio:
+    container_name: tandyr-studio
+  auth:
+    container_name: tandyr-auth
+  rest:
+    container_name: tandyr-rest
+  realtime:
+    container_name: tandyr-realtime
+    networks:
+      default:
+        # The gateway routes to this hostname; its first label is the tenant id.
+        aliases:
+          - realtime-dev.supabase-realtime
+  # Uploaded files live in a named volume instead of ./volumes/storage: Storage
+  # writes extended attributes, which Docker Desktop bind mounts on macOS reject.
+  storage:
+    container_name: tandyr-storage
+    volumes:
+      - storage-data:/var/lib/storage
+  imgproxy:
+    container_name: tandyr-imgproxy
+    volumes:
+      - storage-data:/var/lib/storage
+  meta:
+    container_name: tandyr-meta
+  db:
+    container_name: tandyr-db
+
+  # Postgres via Supavisor: localhost only. Never publish the DB to the internet;
+  # reach it on a VPS through an SSH tunnel.
+  supavisor:
+    container_name: tandyr-pooler
+    ports: !override
+      # Off the Supabase CLI range (54321-54329) to coexist with `supabase start`.
+      - 127.0.0.1:${TANDYR_DB_HOST_PORT:-55432}:5432
+      - 127.0.0.1:${TANDYR_POOLER_HOST_PORT:-55433}:6543
+
+  # API gateway: localhost only. On a VPS the Caddy override resets this and
+  # publishes 80/443 instead.
+  api-gw:
+    container_name: tandyr-envoy
+    ports: !override
+      - 127.0.0.1:${API_GW_HTTP_PORT:-8000}:8000/tcp
+
+  # Tandyr edge functions mounted next to the upstream `main` router.
+  functions:
+    container_name: tandyr-edge-functions
+    volumes:
+      - ../../supabase/functions/_shared:/home/deno/functions/_shared:ro,z
+      - ../../supabase/functions/send-push-notification:/home/deno/functions/send-push-notification:ro,z
+      - ../../supabase/functions/send-progress-reminder:/home/deno/functions/send-progress-reminder:ro,z
+      - ../../supabase/functions/weekly-inventory-scheduler:/home/deno/functions/weekly-inventory-scheduler:ro,z
+
+volumes:
+  storage-data:
