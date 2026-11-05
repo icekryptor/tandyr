@@ -15,6 +15,7 @@ import {
 import { UserPlus, Search, ShieldBan, ShieldCheck, Link2 } from 'lucide-react';
 import Link from 'next/link';
 import { createEmployee, createInvite, toggleEmployeeStatus } from './actions';
+import { ViewToggle } from '@/components/data-grid';
 import { COMPANY_ROLE_LABELS, COMPANY_ROLES, COMPANY_ROLE_COLORS, pluralize } from '@tandyr/shared';
 import type { User, Store } from '@tandyr/shared';
 
@@ -125,6 +126,7 @@ export function EmployeesClient({ employees, stores }: Props) {
           <p className="text-muted-foreground text-sm mt-1">{employees.length} {pluralize(employees.length, 'сотрудник', 'сотрудника', 'сотрудников')}</p>
         </div>
         <div className="flex items-center gap-2">
+          <ViewToggle view="list" />
           <Dialog open={inviteOpen} onOpenChange={handleInviteDialogChange}>
             <DialogTrigger asChild>
               <Button variant="outline">

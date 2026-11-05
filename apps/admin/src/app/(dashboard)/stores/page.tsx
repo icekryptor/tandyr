@@ -1,8 +1,14 @@
 import { createClient } from '@/lib/supabase/server';
 import { StoresClient } from './stores-client';
+import { StoresTable } from './stores-table';
 
-export default async function StoresPage() {
-  const supabase = await createClient();
+export default async function StoresPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const [params, supabase] = await Promise.all([searchParams, createClient()]);
+  const view = params.view === 'table' ? 'table' : 'list';
 
   const initial = await supabase
     .from('stores')
@@ -24,5 +30,9 @@ export default async function StoresPage() {
     .eq('is_active', true)
     .order('full_name');
 
+  if (view === 'table') {
+    const { data: cities } = await supabase.from('cities').select('name').order('name');
+    return <StoresTable stores={stores ?? []} users={users ?? []} cities={(cities ?? []).map((c) => c.name)} />;
+  }
   return <StoresClient stores={stores ?? []} users={users ?? []} />;
 }

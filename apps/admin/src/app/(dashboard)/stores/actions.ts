@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
+import { STORE_INLINE_FIELDS, parseInlineValue, type InlineValue } from '@tandyr/shared';
 
 function safeFloat(v: FormDataEntryValue | null, fallback = 0): number {
   if (!v) return fallback;
@@ -92,5 +93,34 @@ export async function updateResource(resourceId: string, quantityKg: number) {
 
   revalidatePath('/stores');
   if (resource?.store_id) revalidatePath(`/stores/${resource.store_id}`);
+  return { success: true };
+}
+
+/** One cell of the stores table view. RLS ("Admins can manage stores") decides who may write. */
+export async function updateStoreField(id: string, field: string, raw: InlineValue) {
+  if (!Object.hasOwn(STORE_INLINE_FIELDS, field)) return { error: 'Поле нельзя менять из таблицы' };
+  const key = field as keyof typeof STORE_INLINE_FIELDS;
+  const parsed = parseInlineValue(STORE_INLINE_FIELDS[key], raw);
+  if (!parsed.ok) return { error: parsed.error };
+
+  const supabase = await createClient();
+  const patch: Record<string, InlineValue> = { [key]: parsed.value };
+  // city_id drives the city-scoped RLS on stores and shifts, and a NULL city_id makes the
+  // store visible to everyone — so only cities from the directory are accepted.
+  if (key === 'city') {
+    if (!parsed.value) return { error: 'Выберите город из списка' };
+    const { data: city, error: cityError } = await supabase
+      .from('cities').select('id, name').ilike('name', String(parsed.value).replace(/[\\%_]/g, '\\$&')).maybeSingle();
+    if (cityError) return { error: cityError.message };
+    if (!city) return { error: 'Такого города нет в справочнике' };
+    patch.city = city.name;
+    patch.city_id = city.id;
+  }
+
+  const { data, error } = await supabase.from('stores').update(patch).eq('id', id).select('id');
+  if (error) return { error: error.message };
+  if (!data?.length) return { error: 'Нет прав на изменение магазина' };
+  revalidatePath('/stores');
+  revalidatePath(`/stores/${id}`);
   return { success: true };
 }
