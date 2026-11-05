@@ -19,8 +19,9 @@ export async function startShift({
 }: {
   storeId: string;
   photoUrl: string;
-  lat: number;
-  lng: number;
+  /** null when geolocation failed and the employee picked the store by hand. */
+  lat: number | null;
+  lng: number | null;
 }): Promise<ActionResult> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
