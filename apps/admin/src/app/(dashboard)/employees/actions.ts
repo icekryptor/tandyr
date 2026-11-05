@@ -3,33 +3,9 @@
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { updateUserProfileWithTriggerRetry } from '@/lib/supabase/profile-update';
+import { requireAdmin } from '@/lib/require-admin';
 import { revalidatePath } from 'next/cache';
-import { nullifyEmpty, safeFloat } from '@tandyr/shared';
-
-/**
- * Verify the caller is an admin. Server actions can be POSTed directly,
- * bypassing the (dashboard) layout's role gate — so every service-role
- * mutation here must re-check. Without this, any authenticated employee
- * could e.g. reset an admin's password via updateEmployeePassword.
- */
-async function requireAdmin(): Promise<{ ok: true } | { ok: false; error: string }> {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { ok: false, error: 'Не авторизованы' };
-
-  const admin = createAdminClient();
-  const { data: me } = await admin
-    .from('users')
-    .select('role, company_role')
-    .eq('id', user.id)
-    .single();
-  const isSystemAdmin = me?.role === 'admin';
-  const isBusinessAdmin = ['owner', 'admin'].includes(me?.company_role ?? '');
-  if (!me || (!isSystemAdmin && !isBusinessAdmin)) {
-    return { ok: false, error: 'Недостаточно прав' };
-  }
-  return { ok: true };
-}
+import { EMPLOYEE_INLINE_FIELDS, nullifyEmpty, parseInlineValue, safeFloat, type InlineValue } from '@tandyr/shared';
 
 export async function createEmployee(formData: FormData) {
   const gate = await requireAdmin();
@@ -108,6 +84,30 @@ export async function updateEmployee(id: string, formData: FormData) {
   }).eq('id', id);
 
   if (error) return { error: error.message };
+
+  revalidatePath('/employees');
+  revalidatePath(`/employees/${id}`);
+  return { success: true };
+}
+
+/** One cell of the employees table view. */
+export async function updateEmployeeField(id: string, field: string, raw: InlineValue) {
+  const gate = await requireAdmin();
+  if (!gate.ok) return { error: gate.error };
+
+  if (!Object.hasOwn(EMPLOYEE_INLINE_FIELDS, field)) return { error: 'Поле нельзя менять из таблицы' };
+  const key = field as keyof typeof EMPLOYEE_INLINE_FIELDS;
+  // One misclick in the table must not lock the admin out of the panel.
+  if (id === gate.userId && (key === 'company_role' || key === 'is_active')) {
+    return { error: 'Свою роль и статус меняют в карточке другого администратора' };
+  }
+  const parsed = parseInlineValue(EMPLOYEE_INLINE_FIELDS[key], raw);
+  if (!parsed.ok) return { error: parsed.error };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.from('users').update({ [key]: parsed.value }).eq('id', id).select('id');
+  if (error) return { error: error.message };
+  if (!data?.length) return { error: 'Нет прав на изменение сотрудника' };
 
   revalidatePath('/employees');
   revalidatePath(`/employees/${id}`);

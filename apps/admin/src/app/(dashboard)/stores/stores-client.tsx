@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Plus, Trash2, MapPin, Mail, Phone, ChevronRight } from 'lucide-react';
 import { createStore, deleteStore } from './actions';
+import { ViewToggle } from '@/components/data-grid';
 import nextDynamic from 'next/dynamic';
 
 // Dialog-gated: only loaded when the create dialog opens
@@ -66,26 +67,29 @@ export function StoresClient({ stores, users }: { stores: Store[]; users: StaffU
           <h1 className="text-2xl font-bold">Магазины</h1>
           <p className="text-muted-foreground text-sm mt-1">{stores.length} {pluralize(stores.length, 'точка', 'точки', 'точек')}</p>
         </div>
-        <Dialog open={createOpen} onOpenChange={handleDialogChange}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              Добавить магазин
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Новый магазин</DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleCreate} className="space-y-4 mt-2 min-w-0">
-              <StoreFormFields users={users} />
-              {error && <p className="text-destructive text-sm">{error}</p>}
-              <Button type="submit" className="w-full" disabled={isCreating}>
-                {isCreating ? 'Создание...' : 'Создать'}
+        <div className="flex items-center gap-2">
+          <ViewToggle view="list" />
+          <Dialog open={createOpen} onOpenChange={handleDialogChange}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="h-4 w-4 mr-2" />
+                Добавить магазин
               </Button>
-            </form>
-          </DialogContent>
-        </Dialog>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Новый магазин</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleCreate} className="space-y-4 mt-2 min-w-0">
+                <StoreFormFields users={users} />
+                {error && <p className="text-destructive text-sm">{error}</p>}
+                <Button type="submit" className="w-full" disabled={isCreating}>
+                  {isCreating ? 'Создание...' : 'Создать'}
+                </Button>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       {deleteError && (
